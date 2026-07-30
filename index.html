@@ -1408,22 +1408,44 @@
       `).join('');
     }
 
-    function renderBelumAbsenTable() {
+    // =========================================================
+// 1. FUNGSI RENDER TABEL BELUM ABSEN (MENGGUNAKAN LOGIKA LAMA ANDA)
+// =========================================================
+function renderBelumAbsenTable() {
   const tbody = document.getElementById("belum-table-body");
   if (!tbody) return;
 
-  // Catatan: Ganti 'dataSiswaBelum' di bawah dengan nama variabel array data Anda
-  // (misalnya: dataBelumAbsen / listBelumAbsen)
-  const listBelum = typeof dataSiswaBelum !== 'undefined' ? dataSiswaBelum : [];
+  // 1. Ambil input filter dari UI
+  const dateFilter = document.getElementById("belum-date-filter")?.value;
+  const classFilter = document.getElementById("belum-class-filter")?.value;
+  const roleFilter = document.getElementById("belum-role-filter")?.value;
+  const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
 
-  tbody.innerHTML = ""; // Bersihkan tabel terlebih dahulu
+  // 2. Gunakan variabel data siswa/guru asli proyek Anda
+  // (Mengecek otomatis berbagai kemungkinan nama variabel yang ada di script Anda)
+  let listMaster = [];
+  if (typeof dataBelumAbsen !== "undefined") listMaster = dataBelumAbsen;
+  else if (typeof listBelumAbsen !== "undefined") listMaster = listBelumAbsen;
+  else if (typeof siswaList !== "undefined") listMaster = siswaList;
+  else if (typeof dataSiswa !== "undefined") listMaster = dataSiswa;
 
-  if (listBelum.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-400">Semua sudah mengisi absensi</td></tr>`;
+  tbody.innerHTML = "";
+
+  // 3. Filter data
+  const filtered = listMaster.filter(item => {
+    const matchClass = classFilter === "ALL" || !classFilter || item.kelas === classFilter;
+    const matchRole = roleFilter === "ALL" || !roleFilter || (item.peran || "Siswa") === roleFilter;
+    const matchName = (item.nama || "").toLowerCase().includes(searchFilter) || (item.id || item.nisn || "").toString().includes(searchFilter);
+    return matchClass && matchRole && matchName;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-400">Tidak ada data yang cocok / Semua sudah absen</td></tr>`;
     return;
   }
 
-  listBelum.forEach((item) => {
+  // 4. Cetak Baris & 4 Tombol Aksi Manual
+  filtered.forEach((item) => {
     const row = document.createElement("tr");
     row.className = "hover:bg-slate-50 transition border-b border-slate-100";
 
@@ -1442,12 +1464,12 @@
         </span>
       </td>
       <td class="px-6 py-3.5">
-        <!-- 4 TOMBOL AKSI MANUAL -->
-        <div class="flex items-center gap-1.5">
+        <!-- 4 TOMBOL BARU BERFUNGSI -->
+        <div class="flex items-center gap-1.5 flex-wrap">
           <button 
             type="button"
             onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Hadir')"
-            class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs flex items-center gap-1">
+            class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
             ✓ Hadir
           </button>
           <button 
@@ -1473,6 +1495,59 @@
     `;
     tbody.appendChild(row);
   });
+}
+
+// =========================================================
+// 2. FUNGSI KIRIM DATA KE STEIN HQ (SHEET: Absensi)
+// =========================================================
+async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
+  if (!confirm(`Tandai ${nama} (${peran}) sebagai "${statusPilihan}"?`)) return;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+
+  const dateStr = `${year}-${month}-${day}`;
+  const timeStr = `${hours}.${minutes}.${seconds}`;
+  const timestampStr = `${dateStr} ${timeStr}`;
+
+  const jenisAbsenVal = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
+
+  const payloadData = [{
+    timestamp: timestampStr,
+    date: dateStr,
+    time: timeStr,
+    nisn: String(nisn),
+    nama: nama,
+    kelas: kelas,
+    jenisAbsen: jenisAbsenVal,
+    status: statusPilihan,
+    peran: peran,
+    method: "Manual Admin"
+  }];
+
+  try {
+    const response = await fetch("https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76/Absensi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payloadData)
+    });
+
+    if (response.ok) {
+      alert(`Berhasil! ${nama} dicatat sebagai "${statusPilihan}".`);
+      renderBelumAbsenTable();
+    } else {
+      alert("Gagal menyimpan ke Stein HQ.");
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    alert("Koneksi bermasalah.");
+  }
 }
     
     function exportRekapCSV() {
