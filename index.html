@@ -347,7 +347,12 @@
           <div class="p-6 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div><h3 class="font-bold text-slate-800 text-lg">Daftar Belum Mengisi Absensi</h3><p class="text-xs text-slate-500">Realtime — filter menurut tanggal, kelas, jenis sesi, dan peran</p></div>
             <div class="flex flex-wrap items-center gap-3">
-              <input type="date" id="belum-date-filter" onchange="renderBelumAbsenTable()" class="px-3 py-2 bg-slate-50 border rounded-xl text-xs font-semibold" value="">
+              <input 
+  type="date" 
+  id="belum-date-filter" 
+  onchange="renderBelumAbsenTable()" 
+  class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 shadow-xs focus:ring-2 focus:ring-indigo-500 outline-none" 
+/>
               <select id="belum-class-filter" onchange="renderBelumAbsenTable()" class="px-3 py-2 bg-slate-50 border rounded-xl text-xs font-semibold">
                 <option value="ALL">Semua Kelas</option>
               </select>
@@ -1412,87 +1417,101 @@
     // 1. FUNGSI RENDER TABEL BELUM ABSEN (FIXED & FULL)
     // =========================================================
     async function renderBelumAbsenTable() {
-      const tbody = document.getElementById("belum-table-body");
-      if (!tbody) return;
+  const tbody = document.getElementById("belum-table-body");
+  if (!tbody) return;
 
-      const dateInput = document.getElementById("belum-date-filter");
-      if (dateInput && !dateInput.value) {
-        dateInput.value = new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById("belum-date-filter");
+  
+  // Set default tanggal hari ini jika kosong
+  if (dateInput && !dateInput.value) {
+    dateInput.value = new Date().toISOString().split('T')[0];
+  }
+
+  let rawSelectedDate = dateInput?.value || new Date().toISOString().split('T')[0];
+
+  // Helper untuk menormalisasi tanggal ke format YYYY-MM-DD
+  const normalizeDateStr = (dateStr) => {
+    if (!dateStr) return "";
+    let str = String(dateStr).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        // Asumsi DD/MM/YYYY -> YYYY-MM-DD
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
       }
-
-      let selectedDate = dateInput?.value || new Date().toISOString().split('T')[0];
-      const classFilter = document.getElementById("belum-class-filter")?.value || "ALL";
-      const jenisFilter = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
-      const roleFilter = document.getElementById("belum-role-filter")?.value || "ALL";
-      const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
-
-      // Gabungkan Master Data Lokal (Siswa & Guru)
-      const masterData = [
-        ...students.map(s => ({ nisn: s.nisn, nama: s.nama, kelas: s.kelas, peran: "Siswa" })),
-        ...teachers.map(g => ({ nisn: g.nip, nama: g.nama, kelas: g.jabatan || 'Guru', peran: "Guru" }))
-      ];
-
-      // Set ID yang SUDAH ABSEN pada tanggal & jenis sesi ini
-      const setSudahAbsen = new Set();
-      attendanceLogs.forEach(row => {
-        let rowDate = getLogDate(row);
-        if (rowDate === selectedDate && getLogJenis(row).toLowerCase() === jenisFilter.toLowerCase()) {
-          const idAbsen = getLogId(row);
-          if (idAbsen) setSudahAbsen.add(idAbsen);
-        }
-      });
-
-      // Filter daftar yang BELUM ABSEN
-      const listBelumAbsen = masterData.filter(item => {
-        const idUser = String(item.nisn || "").trim();
-        if (!idUser) return false;
-
-        const sudahAbsen = setSudahAbsen.has(idUser);
-        const matchClass = classFilter === "ALL" || item.kelas === classFilter;
-        const matchRole = roleFilter === "ALL" || item.peran === roleFilter;
-        const matchSearch = item.nama.toLowerCase().includes(searchFilter) || idUser.includes(searchFilter);
-
-        return !sudahAbsen && matchClass && matchRole && matchSearch;
-      });
-
-      tbody.innerHTML = "";
-
-      if (listBelumAbsen.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-xs text-slate-400">Semua telah mengisi absensi / Tidak ada data yang cocok.</td></tr>`;
-        return;
-      }
-
-      // Render Baris Tabel
-      listBelumAbsen.forEach((item) => {
-        const row = document.createElement("tr");
-        row.className = "hover:bg-slate-50 transition border-b border-slate-100";
-
-        const idUser = item.nisn || "-";
-        const namaUser = item.nama || "-";
-        const kelasUser = item.kelas || "-";
-        const peranUser = item.peran || "Siswa";
-
-        row.innerHTML = `
-          <td class="px-6 py-3.5 font-mono text-xs text-slate-600">${idUser}</td>
-          <td class="px-6 py-3.5 font-semibold text-slate-800">${namaUser}</td>
-          <td class="px-6 py-3.5 text-xs text-slate-500">${kelasUser}</td>
-          <td class="px-6 py-3.5">
-            <span class="px-2.5 py-1 text-[10px] font-bold rounded-full ${peranUser === 'Guru' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}">
-              ${peranUser}
-            </span>
-          </td>
-          <td class="px-6 py-3.5">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <button type="button" onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Hadir')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-xs">✓ Hadir</button>
-              <button type="button" onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Izin')" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition shadow-xs">Izin</button>
-              <button type="button" onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Sakit')" class="px-2.5 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition shadow-xs">Sakit</button>
-              <button type="button" onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Alfa')" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition shadow-xs">Alfa</button>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(row);
-      });
     }
+    return str;
+  };
+
+  const targetDate = normalizeDateStr(rawSelectedDate);
+  const classFilter = document.getElementById("belum-class-filter")?.value || "ALL";
+  const jenisFilter = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
+  const roleFilter = document.getElementById("belum-role-filter")?.value || "ALL";
+  const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
+
+  // Gabungkan Master Data (Siswa & Guru)
+  const masterData = [
+    ...students.map(s => ({ nisn: String(s.nisn || "").trim(), nama: s.nama, kelas: s.kelas, peran: "Siswa" })),
+    ...teachers.map(g => ({ nisn: String(g.nip || "").trim(), nama: g.nama, kelas: g.jabatan || 'Guru', peran: "Guru" }))
+  ];
+
+  // Kumpulkan ID dari mereka yang SUDAH ABSEN
+  const setSudahAbsen = new Set();
+  attendanceLogs.forEach(row => {
+    let rowDate = normalizeDateStr(getLogDate(row));
+    let rowJenis = getLogJenis(row);
+    
+    if (rowDate === targetDate && rowJenis.toLowerCase() === jenisFilter.toLowerCase()) {
+      const idAbsen = String(getLogId(row) || "").trim();
+      if (idAbsen) setSudahAbsen.add(idAbsen);
+    }
+  });
+
+  // Filter daftar yang BELUM ABSEN
+  const listBelumAbsen = masterData.filter(item => {
+    if (!item.nisn) return false;
+
+    const sudahAbsen = setSudahAbsen.has(item.nisn);
+    const matchClass = classFilter === "ALL" || item.kelas === classFilter;
+    const matchRole = roleFilter === "ALL" || item.peran === roleFilter;
+    const matchSearch = item.nama.toLowerCase().includes(searchFilter) || item.nisn.includes(searchFilter);
+
+    return !sudahAbsen && matchClass && matchRole && matchSearch;
+  });
+
+  tbody.innerHTML = "";
+
+  if (listBelumAbsen.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-xs font-medium text-slate-400">Semua telah mengisi absensi / Tidak ada data yang cocok.</td></tr>`;
+    return;
+  }
+
+  // Render Baris
+  listBelumAbsen.forEach((item) => {
+    const row = document.createElement("tr");
+    row.className = "hover:bg-slate-50 transition border-b border-slate-100";
+
+    row.innerHTML = `
+      <td class="px-6 py-3.5 font-mono text-xs text-slate-600">${item.nisn}</td>
+      <td class="px-6 py-3.5 font-semibold text-slate-800">${item.nama}</td>
+      <td class="px-6 py-3.5 text-xs text-slate-500">${item.kelas}</td>
+      <td class="px-6 py-3.5">
+        <span class="px-2.5 py-1 text-[10px] font-bold rounded-full ${item.peran === 'Guru' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}">
+          ${item.peran}
+        </span>
+      </td>
+      <td class="px-6 py-3.5">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button type="button" onclick="simpanAbsenManual('${item.nisn}', '${item.nama}', '${item.kelas}', '${item.peran}', 'Hadir')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-xs">✓ Hadir</button>
+          <button type="button" onclick="simpanAbsenManual('${item.nisn}', '${item.nama}', '${item.kelas}', '${item.peran}', 'Izin')" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition shadow-xs">Izin</button>
+          <button type="button" onclick="simpanAbsenManual('${item.nisn}', '${item.nama}', '${item.kelas}', '${item.peran}', 'Sakit')" class="px-2.5 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition shadow-xs">Sakit</button>
+          <button type="button" onclick="simpanAbsenManual('${item.nisn}', '${item.nama}', '${item.kelas}', '${item.peran}', 'Alfa')" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition shadow-xs">Alfa</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
 
     // =========================================================
     // 2. FUNGSI SIMPAN ABSEN MANUAL DARI TABEL BELUM ABSEN
