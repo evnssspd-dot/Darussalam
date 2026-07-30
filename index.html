@@ -1409,32 +1409,39 @@
     }
 
     // =========================================================
-// FUNGSI RENDER TABEL BELUM ABSEN (LANGSUNG DARI STEIN HQ)
+// 1. FUNGSI RENDER TABEL BELUM ABSEN (FIX TANGGAL STEIN HQ)
 // =========================================================
 async function renderBelumAbsenTable() {
   const tbody = document.getElementById("belum-table-body");
   if (!tbody) return;
 
-  // 1. Set default filter tanggal jika belum ada
+  // Set default filter tanggal ke YYYY-MM-DD
   const dateInput = document.getElementById("belum-date-filter");
   if (dateInput && !dateInput.value) {
     const today = new Date().toISOString().split('T')[0];
     dateInput.value = today;
   }
 
-  const selectedDate = dateInput?.value || new Date().toISOString().split('T')[0];
+  // Format tanggal agar konsisten (YYYY-MM-DD)
+  let selectedDate = dateInput?.value || new Date().toISOString().split('T')[0];
+  if (selectedDate.includes('/')) {
+    const parts = selectedDate.split('/');
+    if (parts[0].length === 2) {
+      selectedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+
   const classFilter = document.getElementById("belum-class-filter")?.value || "ALL";
   const jenisFilter = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
   const roleFilter = document.getElementById("belum-role-filter")?.value || "ALL";
   const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
 
-  // Tampilkan Indikator Loading
   tbody.innerHTML = `
     <tr>
       <td colspan="5" class="px-6 py-8 text-center text-xs text-slate-500 font-medium">
         <div class="flex items-center justify-center gap-2">
           <div class="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          Memuat data belum absen...
+          Memuat data dari Stein HQ...
         </div>
       </td>
     </tr>`;
@@ -1442,7 +1449,7 @@ async function renderBelumAbsenTable() {
   try {
     const BASE_URL = "https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76";
 
-    // 2. Ambil Data Master Siswa & Data Absensi secara Paralel
+    // Fetch data master & absensi secara sejajar
     const [resSiswa, resGuru, resAbsensi] = await Promise.all([
       fetch(`${BASE_URL}/DataSiswa`).catch(() => ({ ok: false })),
       fetch(`${BASE_URL}/DataGuru`).catch(() => ({ ok: false })),
@@ -1453,31 +1460,35 @@ async function renderBelumAbsenTable() {
     let dataGuruList = resGuru.ok ? await resGuru.json() : [];
     let dataAbsensiList = resAbsensi.ok ? await resAbsensi.json() : [];
 
-    // Jika variabel lokal JavaScript Anda ada, gunakan sebagai fallback
+    // Fallback jika fetch master gagal tapi ada variabel lokal
     if (!Array.isArray(dataSiswaList) || dataSiswaList.length === 0) {
       if (typeof dataSiswa !== "undefined") dataSiswaList = dataSiswa;
-      else if (typeof siswaList !== "undefined") dataSiswaList = siswaList;
     }
 
-    // Gabungkan Master Data (Siswa & Guru)
     const masterData = [
-      ...dataSiswaList.map(s => ({ ...s, peran: s.peran || "Siswa" })),
-      ...dataGuruList.map(g => ({ ...g, peran: g.peran || "Guru" }))
+      ...(Array.isArray(dataSiswaList) ? dataSiswaList.map(s => ({ ...s, peran: s.peran || "Siswa" })) : []),
+      ...(Array.isArray(dataGuruList) ? dataGuruList.map(g => ({ ...g, peran: g.peran || "Guru" })) : [])
     ];
 
-    // 3. Catat Siapa Saja yang SUDAH ABSEN (berdasarkan Tanggal & Jenis Sesi)
+    // Buat daftar ID/NISN yang SUDAH ABSEN pada tanggal & jenis sesi ini
     const setSudahAbsen = new Set();
     if (Array.isArray(dataAbsensiList)) {
       dataAbsensiList.forEach(row => {
-        // Cocokkan Tanggal dan Jenis Sesi (Misal: "Masuk Sekolah")
-        if (row.date === selectedDate && row.jenisAbsen === jenisFilter) {
+        // Normalisasi format tanggal row.date
+        let rowDate = String(row.date || "").trim();
+        if (rowDate.includes('/')) {
+          const p = rowDate.split('/');
+          if (p[0].length === 2) rowDate = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+        }
+
+        if (rowDate === selectedDate && String(row.jenisAbsen || "").trim().toLowerCase() === jenisFilter.trim().toLowerCase()) {
           const idAbsen = String(row.nisn || row.id || "").trim();
           if (idAbsen) setSudahAbsen.add(idAbsen);
         }
       });
     }
 
-    // 4. Filter Siapa yang BELUM ABSEN
+    // Filter daftar BELUM ABSEN
     const listBelumAbsen = masterData.filter(item => {
       const idUser = String(item.nisn || item.id || "").trim();
       if (!idUser) return false;
@@ -1492,13 +1503,12 @@ async function renderBelumAbsenTable() {
 
     tbody.innerHTML = "";
 
-    // 5. Jika memang sudah absen semua
     if (listBelumAbsen.length === 0) {
       tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-xs text-slate-400">Semua sudah mengisi absensi</td></tr>`;
       return;
     }
 
-    // 6. Cetak Baris & 4 Tombol Aksi Manual
+    // Cetak Baris & 4 Tombol Aksi Manual
     listBelumAbsen.forEach((item) => {
       const row = document.createElement("tr");
       row.className = "hover:bg-slate-50 transition border-b border-slate-100";
@@ -1518,7 +1528,6 @@ async function renderBelumAbsenTable() {
           </span>
         </td>
         <td class="px-6 py-3.5">
-          <!-- 4 TOMBOL PILIHAN MANUAL -->
           <div class="flex items-center gap-1.5 flex-wrap">
             <button 
               type="button"
@@ -1571,7 +1580,6 @@ async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const seconds = String(now.getSeconds()).padStart(2, '0');
 
-  // Menggunakan tanggal dari filter tanggal jika ada, atau tanggal hari ini
   const filterDate = document.getElementById("belum-date-filter")?.value;
   const dateStr = filterDate || `${year}-${month}-${day}`;
   const timeStr = `${hours}.${minutes}.${seconds}`;
@@ -1601,7 +1609,7 @@ async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
 
     if (response.ok) {
       alert(`Berhasil! ${nama} dicatat sebagai "${statusPilihan}".`);
-      renderBelumAbsenTable(); // Auto refresh tabel
+      renderBelumAbsenTable();
     } else {
       alert("Gagal menyimpan ke Stein HQ.");
     }
