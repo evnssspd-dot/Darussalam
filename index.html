@@ -1409,13 +1409,13 @@
     }
 
     // =========================================================
-// 1. FUNGSI RENDER TABEL BELUM ABSEN (SAMA DENGAN LOGIKA DASHBOARD)
+// FUNGSI RENDER TABEL BELUM ABSEN (LANGSUNG DARI STEIN HQ)
 // =========================================================
 async function renderBelumAbsenTable() {
   const tbody = document.getElementById("belum-table-body");
   if (!tbody) return;
 
-  // Set default filter tanggal ke Hari Ini jika masih kosong
+  // 1. Set default filter tanggal jika belum ada
   const dateInput = document.getElementById("belum-date-filter");
   if (dateInput && !dateInput.value) {
     const today = new Date().toISOString().split('T')[0];
@@ -1428,55 +1428,82 @@ async function renderBelumAbsenTable() {
   const roleFilter = document.getElementById("belum-role-filter")?.value || "ALL";
   const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
 
-  // Tampilkan loading sebentar
-  tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-400">Memuat data belum absen...</td></tr>`;
+  // Tampilkan Indikator Loading
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="5" class="px-6 py-8 text-center text-xs text-slate-500 font-medium">
+        <div class="flex items-center justify-center gap-2">
+          <div class="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          Memuat data belum absen...
+        </div>
+      </td>
+    </tr>`;
 
   try {
-    // A. Ambil Data Master (Siswa/Guru) & Data Absensi dari Stein HQ
-    // (Gunakan variabel global proyek Anda jika ada, atau fetch jika perlu)
-    let masterData = [];
-    if (typeof dataSiswa !== "undefined") masterData = [...dataSiswa];
-    if (typeof dataGuru !== "undefined" && Array.isArray(dataGuru)) masterData = [...masterData, ...dataGuru];
+    const BASE_URL = "https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76";
 
-    // B. Ambil data yang SUDAH ABSEN pada tanggal & jenisSesi tersebut
-    // Mengambil dari sheet "Absensi"
-    const resAbsensi = await fetch("https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76/Absensi");
-    const dataAbsensi = await resAbsensi.json();
+    // 2. Ambil Data Master Siswa & Data Absensi secara Paralel
+    const [resSiswa, resGuru, resAbsensi] = await Promise.all([
+      fetch(`${BASE_URL}/DataSiswa`).catch(() => ({ ok: false })),
+      fetch(`${BASE_URL}/DataGuru`).catch(() => ({ ok: false })),
+      fetch(`${BASE_URL}/Absensi`).catch(() => ({ ok: false }))
+    ]);
 
-    // Dapatkan list NISN/ID yang SUDAH ABSEN hari ini
-    const idSudahAbsen = new Set(
-      dataAbsensi
-        .filter(row => row.date === selectedDate && row.jenisAbsen === jenisFilter)
-        .map(row => String(row.nisn).trim())
-    );
+    let dataSiswaList = resSiswa.ok ? await resSiswa.json() : [];
+    let dataGuruList = resGuru.ok ? await resGuru.json() : [];
+    let dataAbsensiList = resAbsensi.ok ? await resAbsensi.json() : [];
 
-    // C. Filter User yang BELUM ABSEN
-    const listBelumAbsen = masterData.filter(user => {
-      const idUser = String(user.id || user.nisn || "").trim();
-      const sudahAbsen = idSudahAbsen.has(idUser);
+    // Jika variabel lokal JavaScript Anda ada, gunakan sebagai fallback
+    if (!Array.isArray(dataSiswaList) || dataSiswaList.length === 0) {
+      if (typeof dataSiswa !== "undefined") dataSiswaList = dataSiswa;
+      else if (typeof siswaList !== "undefined") dataSiswaList = siswaList;
+    }
 
-      // Filter atribut UI
-      const matchClass = classFilter === "ALL" || user.kelas === classFilter;
-      const matchRole = roleFilter === "ALL" || (user.peran || "Siswa") === roleFilter;
-      const matchSearch = (user.nama || "").toLowerCase().includes(searchFilter) || idUser.includes(searchFilter);
+    // Gabungkan Master Data (Siswa & Guru)
+    const masterData = [
+      ...dataSiswaList.map(s => ({ ...s, peran: s.peran || "Siswa" })),
+      ...dataGuruList.map(g => ({ ...g, peran: g.peran || "Guru" }))
+    ];
+
+    // 3. Catat Siapa Saja yang SUDAH ABSEN (berdasarkan Tanggal & Jenis Sesi)
+    const setSudahAbsen = new Set();
+    if (Array.isArray(dataAbsensiList)) {
+      dataAbsensiList.forEach(row => {
+        // Cocokkan Tanggal dan Jenis Sesi (Misal: "Masuk Sekolah")
+        if (row.date === selectedDate && row.jenisAbsen === jenisFilter) {
+          const idAbsen = String(row.nisn || row.id || "").trim();
+          if (idAbsen) setSudahAbsen.add(idAbsen);
+        }
+      });
+    }
+
+    // 4. Filter Siapa yang BELUM ABSEN
+    const listBelumAbsen = masterData.filter(item => {
+      const idUser = String(item.nisn || item.id || "").trim();
+      if (!idUser) return false;
+
+      const sudahAbsen = setSudahAbsen.has(idUser);
+      const matchClass = classFilter === "ALL" || item.kelas === classFilter;
+      const matchRole = roleFilter === "ALL" || item.peran === roleFilter;
+      const matchSearch = (item.nama || "").toLowerCase().includes(searchFilter) || idUser.includes(searchFilter);
 
       return !sudahAbsen && matchClass && matchRole && matchSearch;
     });
 
     tbody.innerHTML = "";
 
-    // D. Jika tidak ada yang belum absen
+    // 5. Jika memang sudah absen semua
     if (listBelumAbsen.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-400">Semua sudah mengisi absensi</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-xs text-slate-400">Semua sudah mengisi absensi</td></tr>`;
       return;
     }
 
-    // E. Tampilkan 4 Tombol untuk siswa yang belum absen
+    // 6. Cetak Baris & 4 Tombol Aksi Manual
     listBelumAbsen.forEach((item) => {
       const row = document.createElement("tr");
       row.className = "hover:bg-slate-50 transition border-b border-slate-100";
 
-      const idUser = item.id || item.nisn || "-";
+      const idUser = item.nisn || item.id || "-";
       const namaUser = item.nama || "-";
       const kelasUser = item.kelas || item.jabatan || "-";
       const peranUser = item.peran || "Siswa";
@@ -1491,6 +1518,7 @@ async function renderBelumAbsenTable() {
           </span>
         </td>
         <td class="px-6 py-3.5">
+          <!-- 4 TOMBOL PILIHAN MANUAL -->
           <div class="flex items-center gap-1.5 flex-wrap">
             <button 
               type="button"
@@ -1522,9 +1550,9 @@ async function renderBelumAbsenTable() {
       tbody.appendChild(row);
     });
 
-  } catch (err) {
-    console.error("Gagal memuat data belum absen:", err);
-    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-rose-500">Gagal mengambil data dari server.</td></tr>`;
+  } catch (error) {
+    console.error("Gagal Render Belum Absen:", error);
+    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-rose-500">Terjadi kesalahan saat memuat data.</td></tr>`;
   }
 }
 
