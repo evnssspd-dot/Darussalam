@@ -1409,229 +1409,152 @@
     }
 
     // =========================================================
-// 1. FUNGSI RENDER TABEL BELUM ABSEN (FIX TANGGAL STEIN HQ)
-// =========================================================
-async function renderBelumAbsenTable() {
-  const tbody = document.getElementById("belum-table-body");
-  if (!tbody) return;
+    // 1. FUNGSI RENDER TABEL BELUM ABSEN (FIXED & FULL)
+    // =========================================================
+    async function renderBelumAbsenTable() {
+      const tbody = document.getElementById("belum-table-body");
+      if (!tbody) return;
 
-  // Set default filter tanggal ke YYYY-MM-DD
-  const dateInput = document.getElementById("belum-date-filter");
-  if (dateInput && !dateInput.value) {
-    const today = new Date().toISOString().split('T')[0];
-    dateInput.value = today;
-  }
+      const dateInput = document.getElementById("belum-date-filter");
+      if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+      }
 
-  // Format tanggal agar konsisten (YYYY-MM-DD)
-  let selectedDate = dateInput?.value || new Date().toISOString().split('T')[0];
-  if (selectedDate.includes('/')) {
-    const parts = selectedDate.split('/');
-    if (parts[0].length === 2) {
-      selectedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    }
-  }
+      let selectedDate = dateInput?.value || new Date().toISOString().split('T')[0];
+      const classFilter = document.getElementById("belum-class-filter")?.value || "ALL";
+      const jenisFilter = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
+      const roleFilter = document.getElementById("belum-role-filter")?.value || "ALL";
+      const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
 
-  const classFilter = document.getElementById("belum-class-filter")?.value || "ALL";
-  const jenisFilter = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
-  const roleFilter = document.getElementById("belum-role-filter")?.value || "ALL";
-  const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
+      // Gabungkan Master Data Lokal (Siswa & Guru)
+      const masterData = [
+        ...students.map(s => ({ nisn: s.nisn, nama: s.nama, kelas: s.kelas, peran: "Siswa" })),
+        ...teachers.map(g => ({ nisn: g.nip, nama: g.nama, kelas: g.jabatan || 'Guru', peran: "Guru" }))
+      ];
 
-  tbody.innerHTML = `
-    <tr>
-      <td colspan="5" class="px-6 py-8 text-center text-xs text-slate-500 font-medium">
-        <div class="flex items-center justify-center gap-2">
-          <div class="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          Memuat data dari Stein HQ...
-        </div>
-      </td>
-    </tr>`;
-
-  try {
-    const BASE_URL = "https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76";
-
-    // Fetch data master & absensi secara sejajar
-    const [resSiswa, resGuru, resAbsensi] = await Promise.all([
-      fetch(`${BASE_URL}/DataSiswa`).catch(() => ({ ok: false })),
-      fetch(`${BASE_URL}/DataGuru`).catch(() => ({ ok: false })),
-      fetch(`${BASE_URL}/Absensi`).catch(() => ({ ok: false }))
-    ]);
-
-    let dataSiswaList = resSiswa.ok ? await resSiswa.json() : [];
-    let dataGuruList = resGuru.ok ? await resGuru.json() : [];
-    let dataAbsensiList = resAbsensi.ok ? await resAbsensi.json() : [];
-
-    // Fallback jika fetch master gagal tapi ada variabel lokal
-    if (!Array.isArray(dataSiswaList) || dataSiswaList.length === 0) {
-      if (typeof dataSiswa !== "undefined") dataSiswaList = dataSiswa;
-    }
-
-    const masterData = [
-      ...(Array.isArray(dataSiswaList) ? dataSiswaList.map(s => ({ ...s, peran: s.peran || "Siswa" })) : []),
-      ...(Array.isArray(dataGuruList) ? dataGuruList.map(g => ({ ...g, peran: g.peran || "Guru" })) : [])
-    ];
-
-    // Buat daftar ID/NISN yang SUDAH ABSEN pada tanggal & jenis sesi ini
-    const setSudahAbsen = new Set();
-    if (Array.isArray(dataAbsensiList)) {
-      dataAbsensiList.forEach(row => {
-        // Normalisasi format tanggal row.date
-        let rowDate = String(row.date || "").trim();
-        if (rowDate.includes('/')) {
-          const p = rowDate.split('/');
-          if (p[0].length === 2) rowDate = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
-        }
-
-        if (rowDate === selectedDate && String(row.jenisAbsen || "").trim().toLowerCase() === jenisFilter.trim().toLowerCase()) {
-          const idAbsen = String(row.nisn || row.id || "").trim();
+      // Set ID yang SUDAH ABSEN pada tanggal & jenis sesi ini
+      const setSudahAbsen = new Set();
+      attendanceLogs.forEach(row => {
+        let rowDate = getLogDate(row);
+        if (rowDate === selectedDate && getLogJenis(row).toLowerCase() === jenisFilter.toLowerCase()) {
+          const idAbsen = getLogId(row);
           if (idAbsen) setSudahAbsen.add(idAbsen);
         }
       });
-    }
 
-    // Filter daftar BELUM ABSEN
-    const listBelumAbsen = masterData.filter(item => {
-      const idUser = String(item.nisn || item.id || "").trim();
-      if (!idUser) return false;
+      // Filter daftar yang BELUM ABSEN
+      const listBelumAbsen = masterData.filter(item => {
+        const idUser = String(item.nisn || "").trim();
+        if (!idUser) return false;
 
-      const sudahAbsen = setSudahAbsen.has(idUser);
-      const matchClass = classFilter === "ALL" || item.kelas === classFilter;
-      const matchRole = roleFilter === "ALL" || item.peran === roleFilter;
-      const matchSearch = (item.nama || "").toLowerCase().includes(searchFilter) || idUser.includes(searchFilter);
+        const sudahAbsen = setSudahAbsen.has(idUser);
+        const matchClass = classFilter === "ALL" || item.kelas === classFilter;
+        const matchRole = roleFilter === "ALL" || item.peran === roleFilter;
+        const matchSearch = item.nama.toLowerCase().includes(searchFilter) || idUser.includes(searchFilter);
 
-      return !sudahAbsen && matchClass && matchRole && matchSearch;
-    });
-
-    tbody.innerHTML = "";
-
-    if (listBelumAbsen.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-xs text-slate-400">Semua sudah mengisi absensi</td></tr>`;
-      return;
-    }
-
-    // Cetak Baris & 4 Tombol Aksi Manual
-    listBelumAbsen.forEach((item) => {
-      const row = document.createElement("tr");
-      row.className = "hover:bg-slate-50 transition border-b border-slate-100";
-
-      const idUser = item.nisn || item.id || "-";
-      const namaUser = item.nama || "-";
-      const kelasUser = item.kelas || item.jabatan || "-";
-      const peranUser = item.peran || "Siswa";
-
-      row.innerHTML = `
-        <td class="px-6 py-3.5 font-mono text-xs text-slate-600">${idUser}</td>
-        <td class="px-6 py-3.5 font-semibold text-slate-800">${namaUser}</td>
-        <td class="px-6 py-3.5 text-xs text-slate-500">${kelasUser}</td>
-        <td class="px-6 py-3.5">
-          <span class="px-2.5 py-1 text-[10px] font-bold rounded-full ${peranUser === 'Guru' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}">
-            ${peranUser}
-          </span>
-        </td>
-        <td class="px-6 py-3.5">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <button 
-              type="button"
-              onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Hadir')"
-              class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
-              ✓ Hadir
-            </button>
-            <button 
-              type="button"
-              onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Izin')"
-              class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
-              Izin
-            </button>
-            <button 
-              type="button"
-              onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Sakit')"
-              class="px-2.5 py-1.5 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
-              Sakit
-            </button>
-            <button 
-              type="button"
-              onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Alfa')"
-              class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
-              Alfa
-            </button>
-          </div>
-        </td>
-      `;
-      tbody.appendChild(row);
-    });
-
-  } catch (error) {
-    console.error("Gagal Render Belum Absen:", error);
-    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-rose-500">Terjadi kesalahan saat memuat data.</td></tr>`;
-  }
-}
-
-// =========================================================
-// 2. FUNGSI SIMPAN AKSI MANUAL KE STEIN HQ
-// =========================================================
-async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
-  if (!confirm(`Tandai ${nama} (${peran}) sebagai "${statusPilihan}"?`)) return;
-
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-
-  const filterDate = document.getElementById("belum-date-filter")?.value;
-  const dateStr = filterDate || `${year}-${month}-${day}`;
-  const timeStr = `${hours}.${minutes}.${seconds}`;
-  const timestampStr = `${dateStr} ${timeStr}`;
-
-  const jenisAbsenVal = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
-
-  const payloadData = [{
-    timestamp: timestampStr,
-    date: dateStr,
-    time: timeStr,
-    nisn: String(nisn),
-    nama: nama,
-    kelas: kelas,
-    jenisAbsen: jenisAbsenVal,
-    status: statusPilihan,
-    peran: peran,
-    method: "Manual Admin"
-  }];
-
-  try {
-    const response = await fetch("https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76/Absensi", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payloadData)
-    });
-
-    if (response.ok) {
-      alert(`Berhasil! ${nama} dicatat sebagai "${statusPilihan}".`);
-      renderBelumAbsenTable();
-    } else {
-      alert("Gagal menyimpan ke Stein HQ.");
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    alert("Koneksi bermasalah.");
-  }
-}
-    
-    function exportRekapCSV() {
-      if (attendanceLogs.length === 0) { alert("Belum ada data absensi untuk diekspor!"); return; }
-      let csv = "Timestamp,Tanggal,Waktu,ID_NISN_NIP,Nama,Kelas_Jabatan,Jenis_Sesi,Status,Peran,Metode\n";
-      attendanceLogs.forEach(l => {
-        csv += `"${l.timestamp}","${l.date}","${l.time}","${l.nisn}","${l.nama}","${l.kelas}","${l.jenisAbsen}","${l.status}","${l.peran}","${l.method}"\n`;
+        return !sudahAbsen && matchClass && matchRole && matchSearch;
       });
+
+      tbody.innerHTML = "";
+
+      if (listBelumAbsen.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-xs text-slate-400">Semua telah mengisi absensi / Tidak ada data yang cocok.</td></tr>`;
+        return;
+      }
+
+      // Render Baris Tabel
+      listBelumAbsen.forEach((item) => {
+        const row = document.createElement("tr");
+        row.className = "hover:bg-slate-50 transition border-b border-slate-100";
+
+        const idUser = item.nisn || "-";
+        const namaUser = item.nama || "-";
+        const kelasUser = item.kelas || "-";
+        const peranUser = item.peran || "Siswa";
+
+        row.innerHTML = `
+          <td class="px-6 py-3.5 font-mono text-xs text-slate-600">${idUser}</td>
+          <td class="px-6 py-3.5 font-semibold text-slate-800">${namaUser}</td>
+          <td class="px-6 py-3.5 text-xs text-slate-500">${kelasUser}</td>
+          <td class="px-6 py-3.5">
+            <span class="px-2.5 py-1 text-[10px] font-bold rounded-full ${peranUser === 'Guru' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}">
+              ${peranUser}
+            </span>
+          </td>
+          <td class="px-6 py-3.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button type="button" onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Hadir')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-xs">✓ Hadir</button>
+              <button type="button" onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Izin')" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition shadow-xs">Izin</button>
+              <button type="button" onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Sakit')" class="px-2.5 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition shadow-xs">Sakit</button>
+              <button type="button" onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Alfa')" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition shadow-xs">Alfa</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // =========================================================
+    // 2. FUNGSI SIMPAN ABSEN MANUAL DARI TABEL BELUM ABSEN
+    // =========================================================
+    async function simpanAbsenManual(idUser, namaUser, kelasUser, peranUser, statusAbsen) {
+      const selectedDate = document.getElementById("belum-date-filter")?.value || new Date().toISOString().split('T')[0];
+      const selectedJenis = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
+      const now = new Date();
+
+      const logEntry = {
+        timestamp: `${selectedDate} ${now.toLocaleTimeString('id-ID')}`,
+        date: selectedDate,
+        time: now.toLocaleTimeString('id-ID'),
+        nisn: idUser,
+        nama: namaUser,
+        kelas: kelasUser,
+        jenisAbsen: selectedJenis,
+        status: statusAbsen,
+        peran: peranUser,
+        method: 'Aksi Manual Admin'
+      };
+
+      attendanceLogs.unshift(Object.assign({}, logEntry));
+      normalizeAttendanceLogs();
+      updateDashboardStats(); 
+      renderRecentTable(); 
+      renderRekapTable(); 
+      renderBelumAbsenTable();
+
+      showToast(`Absensi [${statusAbsen}] berhasil disimpan untuk ${namaUser}`);
+      showSyncBadge("Menyimpan ke Stein HQ...", "loading");
+
+      try {
+        await postSteinSheet('Absensi', [logEntry]);
+        showSyncBadge("Tersimpan di Stein HQ", "success");
+      } catch (err) {
+        console.error(err);
+        showSyncBadge("Gagal Simpan ke Stein HQ", "error");
+      }
+    }
+
+    // =========================================================
+    // 3. FUNGSI EKSPORED CSV ABSENSI
+    // =========================================================
+    function exportRekapCSV() {
+      if (attendanceLogs.length === 0) {
+        showToast("Tidak ada data absensi untuk diekspor", "error");
+        return;
+      }
+      let csv = "Tanggal,Waktu,ID/NISN,Nama,Kelas/Jabatan,Sesi Absen,Status,Peran,Metode\n";
+      attendanceLogs.forEach(l => {
+        csv += `"${l.date}","${l.time}","${l.nisn}","${l.nama}","${l.kelas}","${l.jenisAbsen}","${l.status}","${l.peran}","${l.method}"\n`;
+      });
+
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `Rekap_Absensi_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute("download", `Rekap_Absensi_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
     }
-
     function initChart() {
       const ctx = document.getElementById('attendancePieChart').getContext('2d');
       pieChartInstance = new Chart(ctx, {
