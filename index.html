@@ -1474,67 +1474,6 @@
     tbody.appendChild(row);
   });
 }
-
-    async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
-  const konfirmasi = confirm(`Tandai ${nama} (${peran}) sebagai "${statusPilihan}"?`);
-  if (!konfirmasi) return;
-
-  // Format Tanggal & Waktu
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-
-  const dateStr = `${year}-${month}-${day}`;
-  const timeStr = `${hours}.${minutes}.${seconds}`;
-  const timestampStr = `${dateStr} ${timeStr}`;
-
-  // Ambil jenis absen dari dropdown filter "belum-jenis-filter"
-  const jenisAbsenVal = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
-
-  // Data disesuaikan persis dengan kolom Stein HQ / Google Sheets Anda
-  const payloadData = [
-    {
-      timestamp: timestampStr,
-      date: dateStr,
-      time: timeStr,
-      nisn: String(nisn),
-      nama: nama,
-      kelas: kelas,
-      jenisAbsen: jenisAbsenVal,
-      status: statusPilihan,
-      peran: peran,
-      method: "Manual Admin"
-    }
-  ];
-
-  try {
-    // Pengiriman ke API Stein HQ Anda (ganti /Sheet1 jika nama tab sheet Anda beda)
-    const response = await fetch("https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76/Absensi", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payloadData)
-    });
-
-    if (response.ok) {
-      alert(`Berhasil! ${nama} dicatat sebagai "${statusPilihan}".`);
-      
-      // Jalankan ulang fungsi untuk refresh/update tampilan tabel
-      renderBelumAbsenTable();
-    } else {
-      alert("Gagal menyimpan data ke Stein HQ.");
-    }
-  } catch (error) {
-    console.error("Error Stein HQ:", error);
-    alert("Terjadi masalah koneksi internet.");
-  }
-}
     
     function exportRekapCSV() {
       if (attendanceLogs.length === 0) { alert("Belum ada data absensi untuk diekspor!"); return; }
