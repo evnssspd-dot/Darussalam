@@ -1409,51 +1409,133 @@
     }
 
     function renderBelumAbsenTable() {
-      const tbody = document.getElementById('belum-table-body');
-      const dateFilter = document.getElementById('belum-date-filter').value || new Date().toISOString().split('T')[0];
-      const classFilter = document.getElementById('belum-class-filter').value;
-      const jenisFilter = document.getElementById('belum-jenis-filter').value;
-      const roleFilter = document.getElementById('belum-role-filter').value;
-      const nameSearch = document.getElementById('belum-name-search').value.toLowerCase().trim();
+  const tbody = document.getElementById("belum-table-body");
+  if (!tbody) return;
 
-      // Dapatkan list ID yang SUDAH absen di tanggal & sesi tersebut
-      const doneIds = attendanceLogs
-        .filter(l => getLogDate(l) === dateFilter && getLogJenis(l) === jenisFilter)
-        .map(l => getLogId(l));
+  // Catatan: Ganti 'dataSiswaBelum' di bawah dengan nama variabel array data Anda
+  // (misalnya: dataBelumAbsen / listBelumAbsen)
+  const listBelum = typeof dataSiswaBelum !== 'undefined' ? dataSiswaBelum : [];
 
-      let allPeople = [];
-      if (roleFilter === 'ALL' || roleFilter === 'Siswa') {
-        allPeople.push(...students.map(s => ({ id: s.nisn, nama: s.nama, sub: s.kelas, peran: 'Siswa' })));
-      }
-      if (roleFilter === 'ALL' || roleFilter === 'Guru') {
-        allPeople.push(...teachers.map(g => ({ id: g.nip, nama: g.nama, sub: g.jabatan || 'Guru', peran: 'Guru' })));
-      }
+  tbody.innerHTML = ""; // Bersihkan tabel terlebih dahulu
 
-      const belumList = allPeople.filter(p => {
-        const notDone = !doneIds.includes(String(p.id).trim());
-        const matchClass = classFilter === 'ALL' || p.sub === classFilter;
-        const matchName = !nameSearch || p.nama.toLowerCase().includes(nameSearch) || String(p.id).toLowerCase().includes(nameSearch);
-        return notDone && matchClass && matchName;
-      });
+  if (listBelum.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-400">Semua sudah mengisi absensi</td></tr>`;
+    return;
+  }
 
-      if (belumList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-emerald-600 font-bold"><i class="fa-solid fa-circle-check mr-2"></i>Semua sudah mengisi absensi untuk sesi ini!</td></tr>`;
-        return;
-      }
+  listBelum.forEach((item) => {
+    const row = document.createElement("tr");
+    row.className = "hover:bg-slate-50 transition border-b border-slate-100";
 
-      tbody.innerHTML = belumList.map(p => `
-        <tr class="hover:bg-slate-50">
-          <td class="px-6 py-3.5 font-mono font-bold text-slate-700">${p.id}</td>
-          <td class="px-6 py-3.5 font-bold text-slate-800">${p.nama}</td>
-          <td class="px-6 py-3.5 text-xs text-slate-600">${p.sub}</td>
-          <td class="px-6 py-3.5 text-xs"><span class="px-2 py-0.5 rounded-md font-bold ${p.peran === 'Siswa' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'}">${p.peran}</span></td>
-          <td class="px-6 py-3.5">
-            <button onclick="processAttendanceScan('${p.id}', 'Manual Admin')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs"><i class="fa-solid fa-check mr-1"></i> Absenkan</button>
-          </td>
-        </tr>
-      `).join('');
+    const idUser = item.id || item.nisn || "-";
+    const namaUser = item.nama || "-";
+    const kelasUser = item.kelas || item.jabatan || "-";
+    const peranUser = item.peran || "Siswa";
+
+    row.innerHTML = `
+      <td class="px-6 py-3.5 font-mono text-xs text-slate-600">${idUser}</td>
+      <td class="px-6 py-3.5 font-semibold text-slate-800">${namaUser}</td>
+      <td class="px-6 py-3.5 text-xs text-slate-500">${kelasUser}</td>
+      <td class="px-6 py-3.5">
+        <span class="px-2.5 py-1 text-[10px] font-bold rounded-full ${peranUser === 'Guru' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}">
+          ${peranUser}
+        </span>
+      </td>
+      <td class="px-6 py-3.5">
+        <!-- 4 TOMBOL AKSI MANUAL -->
+        <div class="flex items-center gap-1.5">
+          <button 
+            type="button"
+            onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Hadir')"
+            class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs flex items-center gap-1">
+            ✓ Hadir
+          </button>
+          <button 
+            type="button"
+            onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Izin')"
+            class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
+            Izin
+          </button>
+          <button 
+            type="button"
+            onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Sakit')"
+            class="px-2.5 py-1.5 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
+            Sakit
+          </button>
+          <button 
+            type="button"
+            onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Alfa')"
+            class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
+            Alfa
+          </button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+    async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
+  const konfirmasi = confirm(`Tandai ${nama} (${peran}) sebagai "${statusPilihan}"?`);
+  if (!konfirmasi) return;
+
+  // Format Tanggal & Waktu
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+
+  const dateStr = `${year}-${month}-${day}`;
+  const timeStr = `${hours}.${minutes}.${seconds}`;
+  const timestampStr = `${dateStr} ${timeStr}`;
+
+  // Ambil jenis absen dari dropdown filter "belum-jenis-filter"
+  const jenisAbsenVal = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
+
+  // Data disesuaikan persis dengan kolom Stein HQ / Google Sheets Anda
+  const payloadData = [
+    {
+      timestamp: timestampStr,
+      date: dateStr,
+      time: timeStr,
+      nisn: String(nisn),
+      nama: nama,
+      kelas: kelas,
+      jenisAbsen: jenisAbsenVal,
+      status: statusPilihan,
+      peran: peran,
+      method: "Manual Admin"
     }
+  ];
 
+  try {
+    // Pengiriman ke API Stein HQ Anda (ganti /Sheet1 jika nama tab sheet Anda beda)
+    const response = await fetch("https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76/Absensi", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payloadData)
+    });
+
+    if (response.ok) {
+      alert(`Berhasil! ${nama} dicatat sebagai "${statusPilihan}".`);
+      
+      // Jalankan ulang fungsi untuk refresh/update tampilan tabel
+      renderBelumAbsenTable();
+    } else {
+      alert("Gagal menyimpan data ke Stein HQ.");
+    }
+  } catch (error) {
+    console.error("Error Stein HQ:", error);
+    alert("Terjadi masalah koneksi internet.");
+  }
+}
+    
     function exportRekapCSV() {
       if (attendanceLogs.length === 0) { alert("Belum ada data absensi untuk diekspor!"); return; }
       let csv = "Timestamp,Tanggal,Waktu,ID_NISN_NIP,Nama,Kelas_Jabatan,Jenis_Sesi,Status,Peran,Metode\n";
