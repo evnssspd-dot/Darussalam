@@ -1409,96 +1409,127 @@
     }
 
     // =========================================================
-// 1. FUNGSI RENDER TABEL BELUM ABSEN (MENGGUNAKAN LOGIKA LAMA ANDA)
+// 1. FUNGSI RENDER TABEL BELUM ABSEN (SAMA DENGAN LOGIKA DASHBOARD)
 // =========================================================
-function renderBelumAbsenTable() {
+async function renderBelumAbsenTable() {
   const tbody = document.getElementById("belum-table-body");
   if (!tbody) return;
 
-  // 1. Ambil input filter dari UI
-  const dateFilter = document.getElementById("belum-date-filter")?.value;
-  const classFilter = document.getElementById("belum-class-filter")?.value;
-  const roleFilter = document.getElementById("belum-role-filter")?.value;
-  const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
-
-  // 2. Gunakan variabel data siswa/guru asli proyek Anda
-  // (Mengecek otomatis berbagai kemungkinan nama variabel yang ada di script Anda)
-  let listMaster = [];
-  if (typeof dataBelumAbsen !== "undefined") listMaster = dataBelumAbsen;
-  else if (typeof listBelumAbsen !== "undefined") listMaster = listBelumAbsen;
-  else if (typeof siswaList !== "undefined") listMaster = siswaList;
-  else if (typeof dataSiswa !== "undefined") listMaster = dataSiswa;
-
-  tbody.innerHTML = "";
-
-  // 3. Filter data
-  const filtered = listMaster.filter(item => {
-    const matchClass = classFilter === "ALL" || !classFilter || item.kelas === classFilter;
-    const matchRole = roleFilter === "ALL" || !roleFilter || (item.peran || "Siswa") === roleFilter;
-    const matchName = (item.nama || "").toLowerCase().includes(searchFilter) || (item.id || item.nisn || "").toString().includes(searchFilter);
-    return matchClass && matchRole && matchName;
-  });
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-400">Tidak ada data yang cocok / Semua sudah absen</td></tr>`;
-    return;
+  // Set default filter tanggal ke Hari Ini jika masih kosong
+  const dateInput = document.getElementById("belum-date-filter");
+  if (dateInput && !dateInput.value) {
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.value = today;
   }
 
-  // 4. Cetak Baris & 4 Tombol Aksi Manual
-  filtered.forEach((item) => {
-    const row = document.createElement("tr");
-    row.className = "hover:bg-slate-50 transition border-b border-slate-100";
+  const selectedDate = dateInput?.value || new Date().toISOString().split('T')[0];
+  const classFilter = document.getElementById("belum-class-filter")?.value || "ALL";
+  const jenisFilter = document.getElementById("belum-jenis-filter")?.value || "Masuk Sekolah";
+  const roleFilter = document.getElementById("belum-role-filter")?.value || "ALL";
+  const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
 
-    const idUser = item.id || item.nisn || "-";
-    const namaUser = item.nama || "-";
-    const kelasUser = item.kelas || item.jabatan || "-";
-    const peranUser = item.peran || "Siswa";
+  // Tampilkan loading sebentar
+  tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-400">Memuat data belum absen...</td></tr>`;
 
-    row.innerHTML = `
-      <td class="px-6 py-3.5 font-mono text-xs text-slate-600">${idUser}</td>
-      <td class="px-6 py-3.5 font-semibold text-slate-800">${namaUser}</td>
-      <td class="px-6 py-3.5 text-xs text-slate-500">${kelasUser}</td>
-      <td class="px-6 py-3.5">
-        <span class="px-2.5 py-1 text-[10px] font-bold rounded-full ${peranUser === 'Guru' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}">
-          ${peranUser}
-        </span>
-      </td>
-      <td class="px-6 py-3.5">
-        <!-- 4 TOMBOL BARU BERFUNGSI -->
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <button 
-            type="button"
-            onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Hadir')"
-            class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
-            ✓ Hadir
-          </button>
-          <button 
-            type="button"
-            onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Izin')"
-            class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
-            Izin
-          </button>
-          <button 
-            type="button"
-            onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Sakit')"
-            class="px-2.5 py-1.5 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
-            Sakit
-          </button>
-          <button 
-            type="button"
-            onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Alfa')"
-            class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
-            Alfa
-          </button>
-        </div>
-      </td>
-    `;
-    tbody.appendChild(row);
-  });
+  try {
+    // A. Ambil Data Master (Siswa/Guru) & Data Absensi dari Stein HQ
+    // (Gunakan variabel global proyek Anda jika ada, atau fetch jika perlu)
+    let masterData = [];
+    if (typeof dataSiswa !== "undefined") masterData = [...dataSiswa];
+    if (typeof dataGuru !== "undefined" && Array.isArray(dataGuru)) masterData = [...masterData, ...dataGuru];
+
+    // B. Ambil data yang SUDAH ABSEN pada tanggal & jenisSesi tersebut
+    // Mengambil dari sheet "Absensi"
+    const resAbsensi = await fetch("https://api.steinhq.com/v1/storages/6a6b3c7292b1163e9725ca76/Absensi");
+    const dataAbsensi = await resAbsensi.json();
+
+    // Dapatkan list NISN/ID yang SUDAH ABSEN hari ini
+    const idSudahAbsen = new Set(
+      dataAbsensi
+        .filter(row => row.date === selectedDate && row.jenisAbsen === jenisFilter)
+        .map(row => String(row.nisn).trim())
+    );
+
+    // C. Filter User yang BELUM ABSEN
+    const listBelumAbsen = masterData.filter(user => {
+      const idUser = String(user.id || user.nisn || "").trim();
+      const sudahAbsen = idSudahAbsen.has(idUser);
+
+      // Filter atribut UI
+      const matchClass = classFilter === "ALL" || user.kelas === classFilter;
+      const matchRole = roleFilter === "ALL" || (user.peran || "Siswa") === roleFilter;
+      const matchSearch = (user.nama || "").toLowerCase().includes(searchFilter) || idUser.includes(searchFilter);
+
+      return !sudahAbsen && matchClass && matchRole && matchSearch;
+    });
+
+    tbody.innerHTML = "";
+
+    // D. Jika tidak ada yang belum absen
+    if (listBelumAbsen.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-400">Semua sudah mengisi absensi</td></tr>`;
+      return;
+    }
+
+    // E. Tampilkan 4 Tombol untuk siswa yang belum absen
+    listBelumAbsen.forEach((item) => {
+      const row = document.createElement("tr");
+      row.className = "hover:bg-slate-50 transition border-b border-slate-100";
+
+      const idUser = item.id || item.nisn || "-";
+      const namaUser = item.nama || "-";
+      const kelasUser = item.kelas || item.jabatan || "-";
+      const peranUser = item.peran || "Siswa";
+
+      row.innerHTML = `
+        <td class="px-6 py-3.5 font-mono text-xs text-slate-600">${idUser}</td>
+        <td class="px-6 py-3.5 font-semibold text-slate-800">${namaUser}</td>
+        <td class="px-6 py-3.5 text-xs text-slate-500">${kelasUser}</td>
+        <td class="px-6 py-3.5">
+          <span class="px-2.5 py-1 text-[10px] font-bold rounded-full ${peranUser === 'Guru' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}">
+            ${peranUser}
+          </span>
+        </td>
+        <td class="px-6 py-3.5">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button 
+              type="button"
+              onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Hadir')"
+              class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
+              ✓ Hadir
+            </button>
+            <button 
+              type="button"
+              onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Izin')"
+              class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
+              Izin
+            </button>
+            <button 
+              type="button"
+              onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Sakit')"
+              class="px-2.5 py-1.5 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
+              Sakit
+            </button>
+            <button 
+              type="button"
+              onclick="simpanAbsenManual('${idUser}', '${namaUser}', '${kelasUser}', '${peranUser}', 'Alfa')"
+              class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition shadow-xs">
+              Alfa
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+
+  } catch (err) {
+    console.error("Gagal memuat data belum absen:", err);
+    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-rose-500">Gagal mengambil data dari server.</td></tr>`;
+  }
 }
 
 // =========================================================
-// 2. FUNGSI KIRIM DATA KE STEIN HQ (SHEET: Absensi)
+// 2. FUNGSI SIMPAN AKSI MANUAL KE STEIN HQ
 // =========================================================
 async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
   if (!confirm(`Tandai ${nama} (${peran}) sebagai "${statusPilihan}"?`)) return;
@@ -1512,7 +1543,9 @@ async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const seconds = String(now.getSeconds()).padStart(2, '0');
 
-  const dateStr = `${year}-${month}-${day}`;
+  // Menggunakan tanggal dari filter tanggal jika ada, atau tanggal hari ini
+  const filterDate = document.getElementById("belum-date-filter")?.value;
+  const dateStr = filterDate || `${year}-${month}-${day}`;
   const timeStr = `${hours}.${minutes}.${seconds}`;
   const timestampStr = `${dateStr} ${timeStr}`;
 
@@ -1540,7 +1573,7 @@ async function simpanAbsenManual(nisn, nama, kelas, peran, statusPilihan) {
 
     if (response.ok) {
       alert(`Berhasil! ${nama} dicatat sebagai "${statusPilihan}".`);
-      renderBelumAbsenTable();
+      renderBelumAbsenTable(); // Auto refresh tabel
     } else {
       alert("Gagal menyimpan ke Stein HQ.");
     }
