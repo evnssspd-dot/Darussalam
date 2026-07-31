@@ -1289,7 +1289,7 @@
   container.innerHTML = list.map((item, idx) => {
     const isSiswa = item.role === 'SISWA';
     
-    // Warna Tema Dinamis (Siswa = Indigo/Violet, Guru = Amber/Orange)
+    // Tema Warna Dinamis
     const headerBg = isSiswa 
       ? 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 text-white' 
       : 'bg-gradient-to-r from-amber-600 via-amber-700 to-orange-700 text-white';
@@ -1298,21 +1298,29 @@
     const subColor = isSiswa ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200';
     const photoBorder = isSiswa ? 'border-indigo-500' : 'border-amber-500';
 
+    // Penyesuaian ukuran nama
+    const namaStr = item.nama || '-';
+    const nameFontSize = namaStr.length > 18 ? 'text-[9.5px]' : 'text-[11px]';
+
+    // Placeholder jika foto kosong
+    const defaultPlaceholder = 'https://via.placeholder.com/150x200/e2e8f0/64748b?text=FOTO';
+    const fotoSrc = (item.foto && item.foto.trim() !== '') ? item.foto : defaultPlaceholder;
+
     return `
       <div class="kts-card bg-white rounded-2xl flex flex-col justify-between border border-slate-200/80 shadow-md relative overflow-hidden transition hover:shadow-lg">
         
-        <!-- Background Dekorasi (Watermark Bulatan Transparan) -->
+        <!-- Background Dekorasi -->
         <div class="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-indigo-500/10 pointer-events-none"></div>
 
-        <!-- Header Kartu Berwarna -->
-        <div class="${headerBg} px-3 py-2 flex items-center space-x-2.5 relative z-10">
-          <div class="w-8 h-8 shrink-0 bg-white rounded-lg p-0.5 flex items-center justify-center shadow-xs">
+        <!-- Header Kartu -->
+        <div class="${headerBg} px-3 py-1.5 flex items-center space-x-2.5 relative z-10">
+          <div class="w-7 h-7 shrink-0 bg-white rounded-lg p-0.5 flex items-center justify-center shadow-xs">
             <img src="${schoolProfile.logoUrl || 'https://via.placeholder.com/40'}" class="max-w-full max-h-full object-contain" onError="this.src='https://via.placeholder.com/40?text=Logo'">
           </div>
           <div class="flex-1 min-w-0">
-            <h5 class="text-[10.5px] font-black uppercase tracking-tight truncate leading-tight">${schoolProfile.namaSekolah}</h5>
+            <h5 class="text-[10px] font-black uppercase tracking-tight truncate leading-tight">${schoolProfile.namaSekolah}</h5>
             <div class="flex items-center gap-1.5 mt-0.5">
-              <span class="text-[7.5px] font-extrabold ${badgeRoleBg} px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+              <span class="text-[7px] font-extrabold ${badgeRoleBg} px-1.5 py-0.2 rounded-full uppercase tracking-wider">
                 KARTU TANDA ${item.role}
               </span>
             </div>
@@ -1320,29 +1328,38 @@
         </div>
 
         <!-- Bodi Utama Kartu -->
-        <div class="p-3 flex items-center space-x-3 relative z-10 my-auto">
-          <!-- Foto Profil -->
-          <div class="relative shrink-0">
-            <img src="${item.foto || 'https://via.placeholder.com/80?text=Foto'}" class="w-16 h-20 object-cover rounded-xl border-2 ${photoBorder} shadow-xs" onError="this.src='https://via.placeholder.com/80?text=Foto'">
+        <div class="px-3 py-1.5 flex items-center space-x-2.5 relative z-10 my-auto">
+          
+          <!-- FRAME FOTO PROFIL (UKURAN DIKUNCI MATI DENGAN STYLE CSS) -->
+          <div class="shrink-0 rounded-xl border-2 ${photoBorder} overflow-hidden shadow-xs bg-slate-100 flex items-center justify-center" style="width: 60px; height: 76px; min-width: 60px; min-height: 76px;">
+            <img 
+              src="${fotoSrc}" 
+              class="w-full h-full object-cover" 
+              style="width: 100%; height: 100%; object-fit: cover;"
+              onError="this.onerror=null; this.src='${defaultPlaceholder}';"
+            />
           </div>
           
           <!-- Detail Info -->
-          <div class="flex-1 min-w-0 space-y-1">
-            <p class="text-[11.5px] font-black text-slate-800 truncate leading-snug">${item.nama}</p>
+          <div class="flex-1 min-w-0 space-y-0.5">
+            <!-- NAMA LENGKAP -->
+            <p class="${nameFontSize} font-black text-slate-800 leading-tight line-clamp-2 break-words">
+              ${namaStr}
+            </p>
             
-            <div class="flex items-center gap-1 text-[8.5px]">
+            <div class="flex items-center gap-1 text-[8px]">
               <span class="font-semibold text-slate-400">ID:</span>
-              <span class="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">${item.id}</span>
+              <span class="font-mono font-bold text-slate-700 bg-slate-100 px-1 py-0.2 rounded">${item.id}</span>
             </div>
 
-            <div class="text-[8.5px] flex items-center gap-1">
+            <div class="text-[8px] flex items-center gap-1">
               <span class="font-semibold text-slate-400">${isSiswa ? 'Kelas' : 'Jabatan'}:</span>
-              <span class="font-extrabold px-1.5 py-0.5 rounded border ${subColor}">${item.sub}</span>
+              <span class="font-extrabold px-1 py-0.2 rounded border ${subColor}">${item.sub}</span>
             </div>
             
-            <!-- Teks TA (Warna Kontras) -->
+            <!-- Teks TA -->
             <div class="pt-0.5">
-              <span class="inline-block px-1.5 py-0.5 bg-slate-800 text-amber-300 font-extrabold text-[8px] rounded-md tracking-tight">
+              <span class="inline-block px-1.5 py-0.5 bg-slate-800 text-amber-300 font-extrabold text-[7.5px] rounded-md tracking-tight leading-none">
                 TA ${academicYear.tahunPelajaran} (${academicYear.semester})
               </span>
             </div>
@@ -1350,16 +1367,16 @@
 
           <!-- QR Code -->
           <div class="shrink-0 bg-white p-1 rounded-xl border border-indigo-100 shadow-2xs flex items-center justify-center">
-            <div id="qrcode-${idx}" class="w-[72px] h-[72px] flex items-center justify-center"></div>
+            <div id="qrcode-${idx}" class="w-[66px] h-[66px] flex items-center justify-center"></div>
           </div>
         </div>
 
-        <!-- Footer Kartu Berwarna -->
-        <div class="bg-slate-50 border-t border-slate-100 px-3 py-1 flex justify-between items-center text-[8.5px] relative z-10">
+        <!-- Footer Kartu -->
+        <div class="bg-slate-50 border-t border-slate-100 px-3 py-1 flex justify-between items-center text-[8px] relative z-10">
           <span class="font-black text-slate-700">
             NPSN: <span class="text-indigo-600 font-bold">${schoolProfile.npsn}</span>
           </span>
-          <span class="font-extrabold text-indigo-700 uppercase tracking-wider text-[7.5px]">
+          <span class="font-extrabold text-indigo-700 uppercase tracking-wider text-[7px]">
             Absensi QR System
           </span>
         </div>
@@ -1368,15 +1385,15 @@
     `;
   }).join('');
 
-  // Generate QR Code untuk setiap kartu
+  // Generate QR Code
   list.forEach((item, idx) => {
     const qrEl = document.getElementById(`qrcode-${idx}`);
     if (qrEl) {
       qrEl.innerHTML = '';
       new QRCode(qrEl, {
         text: String(item.id),
-        width: 72,
-        height: 72,
+        width: 66,
+        height: 66,
         correctLevel: QRCode.CorrectLevel.H
       });
     }
