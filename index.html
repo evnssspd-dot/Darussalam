@@ -1266,66 +1266,122 @@
 
     /* ============ LAYOUT KARTU A4 (6 Kartu per Halaman) ============ */
     function renderKtsCards() {
-      const container = document.getElementById('print-section');
-      const cardType = document.getElementById('kts-type-filter').value;
-      const classFilter = document.getElementById('kts-class-filter').value;
+  const container = document.getElementById('print-section');
+  const cardType = document.getElementById('kts-type-filter').value;
+  const classFilter = document.getElementById('kts-class-filter').value;
 
-      let list = [];
-      if (cardType === 'SISWA') {
-        list = students.filter(s => classFilter === 'ALL' || s.kelas === classFilter).map(s => ({
-          id: s.nisn, nama: s.nama, sub: s.kelas, role: 'SISWA', foto: s.fotoUrl
-        }));
-      } else {
-        list = teachers.map(g => ({
-          id: g.nip, nama: g.nama, sub: g.jabatan || 'Guru', role: 'GURU / STAF', foto: g.fotoUrl
-        }));
-      }
+  let list = [];
+  if (cardType === 'SISWA') {
+    list = students.filter(s => classFilter === 'ALL' || s.kelas === classFilter).map(s => ({
+      id: s.nisn, nama: s.nama, sub: s.kelas, role: 'SISWA', foto: s.fotoUrl
+    }));
+  } else {
+    list = teachers.map(g => ({
+      id: g.nip, nama: g.nama, sub: g.jabatan || 'Guru', role: 'GURU / STAF', foto: g.fotoUrl
+    }));
+  }
 
-      if (list.length === 0) {
-        container.innerHTML = `<div class="col-span-full text-center text-slate-400 py-10 font-bold">Tidak ada data untuk dicetak.</div>`;
-        return;
-      }
+  if (list.length === 0) {
+    container.innerHTML = `<div class="col-span-full text-center text-slate-400 py-10 font-bold">Tidak ada data untuk dicetak.</div>`;
+    return;
+  }
 
-      container.innerHTML = list.map((item, idx) => `
-        <div class="kts-card bg-white rounded-2xl p-3 flex flex-col justify-between border border-slate-200 relative overflow-hidden bg-gradient-to-br from-white via-slate-50 to-indigo-50/30">
-          <div class="flex items-center space-x-2 border-b border-indigo-100 pb-2">
-            <img src="${schoolProfile.logoUrl || 'https://via.placeholder.com/40'}" class="w-7 h-7 object-cover rounded-lg border bg-white p-0.5">
-            <div class="flex-1 min-w-0">
-              <h5 class="text-[10px] font-extrabold text-slate-800 uppercase tracking-tight truncate leading-none">${schoolProfile.namaSekolah}</h5>
-              <p class="text-[8px] text-indigo-600 font-bold leading-none mt-0.5">KARTU TANDA ${item.role}</p>
-            </div>
+  container.innerHTML = list.map((item, idx) => {
+    const isSiswa = item.role === 'SISWA';
+    
+    // Warna Tema Dinamis (Siswa = Indigo/Violet, Guru = Amber/Orange)
+    const headerBg = isSiswa 
+      ? 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 text-white' 
+      : 'bg-gradient-to-r from-amber-600 via-amber-700 to-orange-700 text-white';
+      
+    const badgeRoleBg = isSiswa ? 'bg-amber-400 text-slate-900' : 'bg-sky-300 text-slate-900';
+    const subColor = isSiswa ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200';
+    const photoBorder = isSiswa ? 'border-indigo-500' : 'border-amber-500';
+
+    return `
+      <div class="kts-card bg-white rounded-2xl flex flex-col justify-between border border-slate-200/80 shadow-md relative overflow-hidden transition hover:shadow-lg">
+        
+        <!-- Background Dekorasi (Watermark Bulatan Transparan) -->
+        <div class="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-indigo-500/10 pointer-events-none"></div>
+
+        <!-- Header Kartu Berwarna -->
+        <div class="${headerBg} px-3 py-2 flex items-center space-x-2.5 relative z-10">
+          <div class="w-8 h-8 shrink-0 bg-white rounded-lg p-0.5 flex items-center justify-center shadow-xs">
+            <img src="${schoolProfile.logoUrl || 'https://via.placeholder.com/40'}" class="max-w-full max-h-full object-contain" onError="this.src='https://via.placeholder.com/40?text=Logo'">
           </div>
-          <div class="flex items-center space-x-3 my-1">
-            <img src="${item.foto || 'https://via.placeholder.com/80?text=Foto'}" class="w-14 h-16 object-cover rounded-xl border border-slate-300 shadow-xs shrink-0">
-            <div class="flex-1 min-w-0 space-y-0.5">
-              <p class="text-[10px] font-bold text-slate-800 truncate leading-tight">${item.nama}</p>
-              <p class="text-[8px] font-semibold text-slate-500">ID: <span class="font-mono text-slate-700">${item.id}</span></p>
-              <p class="text-[8px] font-semibold text-slate-500">${item.role === 'SISWA' ? 'Kelas' : 'Jabatan'}: <span class="text-indigo-700 font-bold">${item.sub}</span></p>
-              <p class="text-[7px] text-slate-400">TA ${academicYear.tahunPelajaran} (${academicYear.semester})</p>
+          <div class="flex-1 min-w-0">
+            <h5 class="text-[10.5px] font-black uppercase tracking-tight truncate leading-tight">${schoolProfile.namaSekolah}</h5>
+            <div class="flex items-center gap-1.5 mt-0.5">
+              <span class="text-[7.5px] font-extrabold ${badgeRoleBg} px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                KARTU TANDA ${item.role}
+              </span>
             </div>
-            <div id="qrcode-${idx}" class="shrink-0 bg-white p-1 rounded-lg border border-slate-200"></div>
-          </div>
-          <div class="border-t border-slate-100 pt-1 flex justify-between items-center text-[7px] text-slate-400">
-            <span>NPSN: ${schoolProfile.npsn}</span>
-            <span class="font-semibold text-indigo-600">Absensi QR System</span>
           </div>
         </div>
-      `).join('');
 
-      // Generate QR Code untuk setiap kartu
-      list.forEach((item, idx) => {
-        const qrEl = document.getElementById(`qrcode-${idx}`);
-        if (qrEl) {
-          qrEl.innerHTML = '';
-          new QRCode(qrEl, {
-            text: String(item.id),
-            width: 48,
-            height: 48,
-            correctLevel: QRCode.CorrectLevel.H
-          });
-        }
+        <!-- Bodi Utama Kartu -->
+        <div class="p-3 flex items-center space-x-3 relative z-10 my-auto">
+          <!-- Foto Profil -->
+          <div class="relative shrink-0">
+            <img src="${item.foto || 'https://via.placeholder.com/80?text=Foto'}" class="w-16 h-20 object-cover rounded-xl border-2 ${photoBorder} shadow-xs" onError="this.src='https://via.placeholder.com/80?text=Foto'">
+          </div>
+          
+          <!-- Detail Info -->
+          <div class="flex-1 min-w-0 space-y-1">
+            <p class="text-[11.5px] font-black text-slate-800 truncate leading-snug">${item.nama}</p>
+            
+            <div class="flex items-center gap-1 text-[8.5px]">
+              <span class="font-semibold text-slate-400">ID:</span>
+              <span class="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">${item.id}</span>
+            </div>
+
+            <div class="text-[8.5px] flex items-center gap-1">
+              <span class="font-semibold text-slate-400">${isSiswa ? 'Kelas' : 'Jabatan'}:</span>
+              <span class="font-extrabold px-1.5 py-0.5 rounded border ${subColor}">${item.sub}</span>
+            </div>
+            
+            <!-- Teks TA (Warna Kontras) -->
+            <div class="pt-0.5">
+              <span class="inline-block px-1.5 py-0.5 bg-slate-800 text-amber-300 font-extrabold text-[8px] rounded-md tracking-tight">
+                TA ${academicYear.tahunPelajaran} (${academicYear.semester})
+              </span>
+            </div>
+          </div>
+
+          <!-- QR Code -->
+          <div class="shrink-0 bg-white p-1 rounded-xl border border-indigo-100 shadow-2xs flex items-center justify-center">
+            <div id="qrcode-${idx}" class="w-[72px] h-[72px] flex items-center justify-center"></div>
+          </div>
+        </div>
+
+        <!-- Footer Kartu Berwarna -->
+        <div class="bg-slate-50 border-t border-slate-100 px-3 py-1 flex justify-between items-center text-[8.5px] relative z-10">
+          <span class="font-black text-slate-700">
+            NPSN: <span class="text-indigo-600 font-bold">${schoolProfile.npsn}</span>
+          </span>
+          <span class="font-extrabold text-indigo-700 uppercase tracking-wider text-[7.5px]">
+            Absensi QR System
+          </span>
+        </div>
+
+      </div>
+    `;
+  }).join('');
+
+  // Generate QR Code untuk setiap kartu
+  list.forEach((item, idx) => {
+    const qrEl = document.getElementById(`qrcode-${idx}`);
+    if (qrEl) {
+      qrEl.innerHTML = '';
+      new QRCode(qrEl, {
+        text: String(item.id),
+        width: 72,
+        height: 72,
+        correctLevel: QRCode.CorrectLevel.H
       });
     }
+  });
+}
 
     /* ============ REKAP & DASHBOARD STATS ============ */
     function updateDashboardStats() {
