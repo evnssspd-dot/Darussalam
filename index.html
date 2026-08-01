@@ -1551,19 +1551,49 @@
     }
 
     function exportRekapCSV() {
-      if (attendanceLogs.length === 0) { alert("Data absensi kosong!"); return; }
-      let csv = "Timestamp,Tanggal,Waktu,ID_NISN_NIP,Nama,Kelas_Jabatan,Jenis_Sesi,Status,Peran,Metode\n";
-      attendanceLogs.forEach(l => {
-        csv += `"${l.timestamp}","${l.date}","${l.time}","${l.nisn}","${l.nama}","${l.kelas}","${l.jenisAbsen}","${l.status}","${l.peran}","${l.method}"\n`;
-      });
-      const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csv);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Rekap_Absensi_${getTodayLocalDateStr()}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+  if (attendanceLogs.length === 0) { 
+    alert("Data absensi kosong!"); 
+    return; 
+  }
+
+  // Header CSV
+  let csv = "Timestamp,Tanggal,Waktu,ID_NISN_NIP,Nama,Kelas_Jabatan,Jenis_Sesi,Status,Peran,Metode\n";
+
+  attendanceLogs.forEach(l => {
+    // Sanitasi data agar null/undefined tidak menyebabkan error
+    const timestamp = (l.timestamp || '').toString().replace(/"/g, '""');
+    const date = (l.date || '').toString().replace(/"/g, '""');
+    const time = (l.time || '').toString().replace(/"/g, '""');
+    const nama = (l.nama || '').toString().replace(/"/g, '""');
+    const kelas = (l.kelas || '').toString().replace(/"/g, '""');
+    const jenisAbsen = (l.jenisAbsen || '').toString().replace(/"/g, '""');
+    const status = (l.status || '').toString().replace(/"/g, '""');
+    const peran = (l.peran || '').toString().replace(/"/g, '""');
+    const method = (l.method || '').toString().replace(/"/g, '""');
+
+    // PERBAIKAN UTAMA: Format ID dibungkus `="ID"` agar dipaksa menjadi teks murni oleh Excel
+    const nisnRaw = (l.nisn || '').toString().replace(/"/g, '""');
+    const formattedId = `="${nisnRaw}"`;
+
+    csv += `"${timestamp}","${date}","${time}",${formattedId},"${nama}","${kelas}","${jenisAbsen}","${status}","${peran}","${method}"\n`;
+  });
+
+  // Menggunakan Blob + BOM (\uFEFF) alih-alih encodeURI agar aman untuk data ukuran besar dan UTF-8 di Excel
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `Rekap_Absensi_${getTodayLocalDateStr()}.csv`);
+  link.style.visibility = "hidden";
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  // Membersihkan memori URL blob
+  URL.revokeObjectURL(url);
+}
 
     /* ============ PERBAIKAN: TABEL BELUM ABSEN & TOMBOL AKSI MANUAL ============ */
     function renderBelumAbsenTable() {
