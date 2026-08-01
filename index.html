@@ -1499,32 +1499,68 @@ function getBadgeStatus(status) {
 }
 
 // =========================================================
-// 4. TABEL REKAP ABSENSI
+// TABEL REKAP ABSENSI (FIXED: DEFAULT TANGGAL HARI INI)
 // =========================================================
 function renderRekapTable() {
   const tbody = document.getElementById('rekap-table-body');
   if (!tbody) return;
 
-  const dateFilter = document.getElementById('rekap-date-filter')?.value;
+  const dateFilterInput = document.getElementById('rekap-date-filter');
+  const todayStr = getTodayLocalDateStr();
+
+  // 1. SET DEFAULT INPUT TANGGAL KE HARI INI (REALTIME) JIKA MASIH KOSONG
+  if (dateFilterInput && !dateFilterInput.value) {
+    dateFilterInput.value = todayStr;
+  }
+
+  // 2. AMBIL NILAI FILTER
+  const dateFilter = dateFilterInput?.value || todayStr;
   const dateText = document.getElementById('rekap-date-text')?.value.trim() || "";
   const nameSearch = document.getElementById('rekap-name-search')?.value.toLowerCase().trim() || "";
   const jenisFilter = document.getElementById('rekap-jenis-filter')?.value || "ALL";
   const classFilter = document.getElementById('rekap-class-filter')?.value || "ALL";
 
+  // Helper normalisasi tanggal agar cocok dengan YYYY-MM-DD
+  const normalizeDate = (dStr) => {
+    if (!dStr) return "";
+    let str = String(dStr).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    return str;
+  };
+
+  // 3. FILTER DATA LOG
   const filtered = attendanceLogs.filter(l => {
-    const mDate = !dateFilter || getLogDate(l) === dateFilter;
-    const mDateText = !dateText || getLogDate(l).includes(dateText);
-    const mName = !nameSearch || (l.nama && l.nama.toLowerCase().includes(nameSearch)) || (getLogId(l) && getLogId(l).toLowerCase().includes(nameSearch));
+    const logDate = normalizeDate(getLogDate(l));
+    
+    // Cocokkan Tanggal (Default: Hari Ini)
+    const mDate = !dateFilter || logDate === normalizeDate(dateFilter);
+    const mDateText = !dateText || logDate.includes(dateText);
+    const mName = !nameSearch || 
+                  (l.nama && l.nama.toLowerCase().includes(nameSearch)) || 
+                  (getLogId(l) && getLogId(l).toLowerCase().includes(nameSearch));
     const mJenis = jenisFilter === 'ALL' || getLogJenis(l) === jenisFilter;
     const mClass = classFilter === 'ALL' || l.kelas === classFilter;
+
     return mDate && mDateText && mName && mJenis && mClass;
   });
 
+  // 4. JIKA TIDAK ADA DATA HARI INI
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400 font-medium">Tidak ada log absensi yang cocok.</td></tr>`;
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="p-8 text-center text-slate-400 font-medium">
+          Belum ada log absensi untuk tanggal <span class="font-bold text-slate-600">${dateFilter}</span>
+        </td>
+      </tr>`;
     return;
   }
 
+  // 5. RENDER BARIS TABEL
   tbody.innerHTML = filtered.map(l => `
     <tr class="hover:bg-slate-50 transition border-b border-slate-100">
       <td class="px-6 py-3.5 text-xs text-slate-500 font-semibold">${getLogDate(l)} ${l.time || ''}</td>
@@ -1537,7 +1573,6 @@ function renderRekapTable() {
     </tr>
   `).join('');
 }
-
 // =========================================================
 // 5. TABEL BELUM ABSEN (FIXED TANGGAL LOKAL)
 // =========================================================
