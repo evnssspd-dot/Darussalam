@@ -1400,116 +1400,167 @@
   });
 }
 
-    /* ============ REKAP & DASHBOARD STATS ============ */
-    function updateDashboardStats() {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const todayLogs = attendanceLogs.filter(l => getLogDate(l) === todayStr && getLogJenis(l) === 'Masuk Sekolah');
-      
-      const totalSiswaGuru = students.length + teachers.length;
-      const hadirCount = todayLogs.filter(l => l.status === 'Hadir' || l.status === 'Terlambat').length;
-      const izinCount = todayLogs.filter(l => l.status === 'Izin' || l.status === 'Sakit').length;
-      const alfaCount = todayLogs.filter(l => l.status === 'Alfa').length;
-      const belumCount = Math.max(0, totalSiswaGuru - (hadirCount + izinCount + alfaCount));
-
-      document.getElementById('stat-total-siswa').innerText = totalSiswaGuru;
-      document.getElementById('stat-hadir').innerText = hadirCount;
-      document.getElementById('stat-izin').innerText = izinCount;
-      document.getElementById('stat-alpa').innerText = alfaCount + belumCount;
-
-      const pct = totalSiswaGuru > 0 ? Math.round((hadirCount / totalSiswaGuru) * 100) : 0;
-      document.getElementById('stat-hadir-pct').innerText = `${pct}% dari total`;
-
-      updatePieChart(hadirCount, izinCount, alfaCount + belumCount);
-    }
-
-    function renderRecentTable() {
-      const tbody = document.getElementById('dashboard-recent-table');
-      const recent = attendanceLogs.slice(0, 5);
-      if (recent.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Belum ada aktivitas absensi</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = recent.map(l => `
-        <tr class="hover:bg-slate-50">
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.time || l.timestamp}</td>
-          <td class="px-6 py-3.5 font-bold font-mono text-slate-700">${l.nisn}</td>
-          <td class="px-6 py-3.5 font-bold text-slate-800">${l.nama}</td>
-          <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">${l.jenisAbsen}</span></td>
-          <td class="px-6 py-3.5">${getBadgeStatus(l.status)}</td>
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.peran} (${l.kelas})</td>
-        </tr>
-      `).join('');
-    }
-
-    /* PERBAIKAN: Badge Status Tambahan Alfa */
-    function getBadgeStatus(status) {
-      if (status === 'Hadir') return `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold">Hadir</span>`;
-      if (status === 'Terlambat') return `<span class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-xs font-bold">Terlambat</span>`;
-      if (status === 'Alfa') return `<span class="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-lg text-xs font-bold">Alfa</span>`;
-      if (status === 'Izin' || status === 'Sakit') return `<span class="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-lg text-xs font-bold">${status}</span>`;
-      if (status === 'Pulang') return `<span class="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-bold">Pulang</span>`;
-      return `<span class="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg text-xs font-bold">${status}</span>`;
-    }
-
-    function renderRekapTable() {
-      const tbody = document.getElementById('rekap-table-body');
-      const dateFilter = document.getElementById('rekap-date-filter').value;
-      const dateText = document.getElementById('rekap-date-text').value.trim();
-      const nameSearch = document.getElementById('rekap-name-search').value.toLowerCase().trim();
-      const jenisFilter = document.getElementById('rekap-jenis-filter').value;
-      const classFilter = document.getElementById('rekap-class-filter').value;
-
-      const filtered = attendanceLogs.filter(l => {
-        const mDate = !dateFilter || getLogDate(l) === dateFilter;
-        const mDateText = !dateText || getLogDate(l).includes(dateText);
-        const mName = !nameSearch || l.nama.toLowerCase().includes(nameSearch) || getLogId(l).toLowerCase().includes(nameSearch);
-        const mJenis = jenisFilter === 'ALL' || getLogJenis(l) === jenisFilter;
-        const mClass = classFilter === 'ALL' || l.kelas === classFilter;
-        return mDate && mDateText && mName && mJenis && mClass;
-      });
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">Tidak ada log absensi yang cocok</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = filtered.map(l => `
-        <tr class="hover:bg-slate-50">
-          <td class="px-6 py-3.5 text-xs text-slate-500 font-semibold">${l.date} ${l.time}</td>
-          <td class="px-6 py-3.5 font-mono font-bold text-slate-700">${l.nisn}</td>
-          <td class="px-6 py-3.5 font-bold text-slate-800">${l.nama}</td>
-          <td class="px-6 py-3.5 text-xs text-slate-600 font-medium">${l.kelas}</td>
-          <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">${l.jenisAbsen}</span></td>
-          <td class="px-6 py-3.5">${getBadgeStatus(l.status)}</td>
-          <td class="px-6 py-3.5 text-xs text-slate-500">${l.peran}</td>
-        </tr>
-      `).join('');
-    }
-
     // =========================================================
-    // 1. FUNGSI RENDER TABEL BELUM ABSEN (FIXED & FULL)
-    // =========================================================
-    async function renderBelumAbsenTable() {
+// HELPER BANTUAN TANGGAL LOKAL (WIB / Mencegah Bug UTC)
+// =========================================================
+function getTodayLocalDateStr() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`; // Format pasti: YYYY-MM-DD sesuai jam HP/Komputer
+}
+
+// =========================================================
+// 1. DASHBOARD STATS (FIXED REALTIME TANGGAL)
+// =========================================================
+function updateDashboardStats() {
+  const todayStr = getTodayLocalDateStr();
+
+  // Filter HANYA log untuk HARI INI dan Jenis 'Masuk Sekolah'
+  const todayLogs = attendanceLogs.filter(l => {
+    return getLogDate(l) === todayStr && getLogJenis(l) === 'Masuk Sekolah';
+  });
+  
+  const totalSiswaGuru = (students ? students.length : 0) + (teachers ? teachers.length : 0);
+  const hadirCount = todayLogs.filter(l => l.status === 'Hadir' || l.status === 'Terlambat').length;
+  const izinCount = todayLogs.filter(l => l.status === 'Izin' || l.status === 'Sakit').length;
+  const alfaCount = todayLogs.filter(l => l.status === 'Alfa').length;
+  
+  // Belum Absen = Total Pengguna dikurangi yang SUDAH melakukan aksi (Hadir/Izin/Sakit/Alfa) HARI INI
+  const belumCount = Math.max(0, totalSiswaGuru - (hadirCount + izinCount + alfaCount));
+
+  // Update DOM Element
+  if (document.getElementById('stat-total-siswa')) {
+    document.getElementById('stat-total-siswa').innerText = totalSiswaGuru;
+  }
+  if (document.getElementById('stat-hadir')) {
+    document.getElementById('stat-hadir').innerText = hadirCount;
+  }
+  if (document.getElementById('stat-izin')) {
+    document.getElementById('stat-izin').innerText = izinCount;
+  }
+  if (document.getElementById('stat-alpa')) {
+    document.getElementById('stat-alpa').innerText = alfaCount + belumCount;
+  }
+
+  const pct = totalSiswaGuru > 0 ? Math.round((hadirCount / totalSiswaGuru) * 100) : 0;
+  if (document.getElementById('stat-hadir-pct')) {
+    document.getElementById('stat-hadir-pct').innerText = `${pct}% dari total`;
+  }
+
+  if (typeof updatePieChart === 'function') {
+    updatePieChart(hadirCount, izinCount, alfaCount + belumCount);
+  }
+}
+
+// =========================================================
+// 2. TABEL AKTIVITAS TERBARU (FIXED: HANYA DARI HARI INI)
+// =========================================================
+function renderRecentTable() {
+  const tbody = document.getElementById('dashboard-recent-table');
+  if (!tbody) return;
+
+  const todayStr = getTodayLocalDateStr();
+
+  // FILTER: Hanya ambil log yang terjadi HARI INI
+  const todayRecent = attendanceLogs.filter(l => getLogDate(l) === todayStr);
+
+  if (todayRecent.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 font-medium">Belum ada aktivitas absensi hari ini.</td></tr>`;
+    return;
+  }
+
+  // Ambil 5 aktivitas terbaru hari ini
+  const recent = todayRecent.slice(0, 5);
+
+  tbody.innerHTML = recent.map(l => `
+    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+      <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.time || l.timestamp || '-'}</td>
+      <td class="px-6 py-3.5 font-bold font-mono text-slate-700">${getLogId(l) || l.nisn || '-'}</td>
+      <td class="px-6 py-3.5 font-bold text-slate-800">${l.nama || '-'}</td>
+      <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">${getLogJenis(l)}</span></td>
+      <td class="px-6 py-3.5">${getBadgeStatus(l.status)}</td>
+      <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.peran || 'Siswa'} (${l.kelas || '-'})</td>
+    </tr>
+  `).join('');
+}
+
+// =========================================================
+// 3. BADGE STATUS
+// =========================================================
+function getBadgeStatus(status) {
+  if (status === 'Hadir') return `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold">Hadir</span>`;
+  if (status === 'Terlambat') return `<span class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-xs font-bold">Terlambat</span>`;
+  if (status === 'Alfa') return `<span class="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-lg text-xs font-bold">Alfa</span>`;
+  if (status === 'Izin' || status === 'Sakit') return `<span class="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-lg text-xs font-bold">${status}</span>`;
+  if (status === 'Pulang') return `<span class="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-bold">Pulang</span>`;
+  return `<span class="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg text-xs font-bold">${status}</span>`;
+}
+
+// =========================================================
+// 4. TABEL REKAP ABSENSI
+// =========================================================
+function renderRekapTable() {
+  const tbody = document.getElementById('rekap-table-body');
+  if (!tbody) return;
+
+  const dateFilter = document.getElementById('rekap-date-filter')?.value;
+  const dateText = document.getElementById('rekap-date-text')?.value.trim() || "";
+  const nameSearch = document.getElementById('rekap-name-search')?.value.toLowerCase().trim() || "";
+  const jenisFilter = document.getElementById('rekap-jenis-filter')?.value || "ALL";
+  const classFilter = document.getElementById('rekap-class-filter')?.value || "ALL";
+
+  const filtered = attendanceLogs.filter(l => {
+    const mDate = !dateFilter || getLogDate(l) === dateFilter;
+    const mDateText = !dateText || getLogDate(l).includes(dateText);
+    const mName = !nameSearch || (l.nama && l.nama.toLowerCase().includes(nameSearch)) || (getLogId(l) && getLogId(l).toLowerCase().includes(nameSearch));
+    const mJenis = jenisFilter === 'ALL' || getLogJenis(l) === jenisFilter;
+    const mClass = classFilter === 'ALL' || l.kelas === classFilter;
+    return mDate && mDateText && mName && mJenis && mClass;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400 font-medium">Tidak ada log absensi yang cocok.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(l => `
+    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+      <td class="px-6 py-3.5 text-xs text-slate-500 font-semibold">${getLogDate(l)} ${l.time || ''}</td>
+      <td class="px-6 py-3.5 font-mono font-bold text-slate-700">${getLogId(l)}</td>
+      <td class="px-6 py-3.5 font-bold text-slate-800">${l.nama}</td>
+      <td class="px-6 py-3.5 text-xs text-slate-600 font-medium">${l.kelas}</td>
+      <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">${getLogJenis(l)}</span></td>
+      <td class="px-6 py-3.5">${getBadgeStatus(l.status)}</td>
+      <td class="px-6 py-3.5 text-xs text-slate-500">${l.peran || 'Siswa'}</td>
+    </tr>
+  `).join('');
+}
+
+// =========================================================
+// 5. TABEL BELUM ABSEN (FIXED TANGGAL LOKAL)
+// =========================================================
+async function renderBelumAbsenTable() {
   const tbody = document.getElementById("belum-table-body");
   if (!tbody) return;
 
   const dateInput = document.getElementById("belum-date-filter");
+  const todayStr = getTodayLocalDateStr();
   
-  // Set default tanggal hari ini jika kosong
+  // Set default tanggal hari ini (Lokal) jika kosong
   if (dateInput && !dateInput.value) {
-    dateInput.value = new Date().toISOString().split('T')[0];
+    dateInput.value = todayStr;
   }
 
-  let rawSelectedDate = dateInput?.value || new Date().toISOString().split('T')[0];
+  let rawSelectedDate = dateInput?.value || todayStr;
 
-  // Helper untuk menormalisasi tanggal ke format YYYY-MM-DD
   const normalizeDateStr = (dateStr) => {
     if (!dateStr) return "";
     let str = String(dateStr).trim();
     if (str.includes('/')) {
       const parts = str.split('/');
       if (parts.length === 3) {
-        // Asumsi DD/MM/YYYY -> YYYY-MM-DD
         return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
       }
     }
@@ -1522,10 +1573,10 @@
   const roleFilter = document.getElementById("belum-role-filter")?.value || "ALL";
   const searchFilter = document.getElementById("belum-name-search")?.value?.toLowerCase() || "";
 
-  // Gabungkan Master Data (Siswa & Guru)
+  // Master Data
   const masterData = [
-    ...students.map(s => ({ nisn: String(s.nisn || "").trim(), nama: s.nama, kelas: s.kelas, peran: "Siswa" })),
-    ...teachers.map(g => ({ nisn: String(g.nip || "").trim(), nama: g.nama, kelas: g.jabatan || 'Guru', peran: "Guru" }))
+    ...(students || []).map(s => ({ nisn: String(s.nisn || "").trim(), nama: s.nama, kelas: s.kelas, peran: "Siswa" })),
+    ...(teachers || []).map(g => ({ nisn: String(g.nip || "").trim(), nama: g.nama, kelas: g.jabatan || 'Guru', peran: "Guru" }))
   ];
 
   // Kumpulkan ID dari mereka yang SUDAH ABSEN
@@ -1585,7 +1636,6 @@
     tbody.appendChild(row);
   });
 }
-
     // =========================================================
     // 2. FUNGSI SIMPAN ABSEN MANUAL DARI TABEL BELUM ABSEN
     // =========================================================
