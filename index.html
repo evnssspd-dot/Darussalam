@@ -616,11 +616,30 @@
       checkSavedSession();
     });
 
+    /* Helper Normalisasi Role untuk Admin */
+    function normalizeRole(roleStr) {
+      const r = String(roleStr || '').trim();
+      if (r.toLowerCase() === 'admin' || r.toLowerCase() === 'administrator') {
+        return 'Administrator';
+      }
+      return r;
+    }
+
+    function getTodayLocalDateStr() {
+      const d = new Date();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${month}-${day}`;
+    }
+
     /* ============ OTENTIKASI & RBAC ============ */
     async function checkSavedSession() {
       const saved = localStorage.getItem('absensi_qr_session');
       if (saved) {
         currentUser = JSON.parse(saved);
+        if (currentUser && currentUser.ID) {
+          currentUser.ID = normalizeRole(currentUser.ID);
+        }
         document.getElementById('login-screen').classList.add('hidden');
         initApp();
       } else {
@@ -653,8 +672,8 @@
           currentUser = {
             username: found.username,
             namaPengguna: found.namaPengguna || found.username,
-            ID: found.ID || 'Administrator',
-            kelasDiampu: found.kelasDiampu || '' // Opsional jika wali kelas punya spesifik kelas
+            ID: normalizeRole(found.ID || 'Administrator'),
+            kelasDiampu: found.kelasDiampu || ''
           };
 
           localStorage.setItem('absensi_qr_session', JSON.stringify(currentUser));
@@ -689,10 +708,8 @@
 
       document.getElementById('user-display-info').innerText = `${currentUser.namaPengguna} (${currentUser.ID})`;
 
-      // Render Navigasi Sesuai Hak Akses Role
       renderNavMenu();
 
-      // Penyesuaian Role Kepala Sekolah
       if (currentUser.ID === 'Kepala Sekolah') {
         const rekapRole = document.getElementById('rekap-role-filter');
         if (rekapRole) {
@@ -706,7 +723,6 @@
         }
       }
 
-      // Penyesuaian Role Wali Kelas
       if (currentUser.ID === 'Wali Kelas' && currentUser.kelasDiampu) {
         const sClass = document.getElementById('siswa-class-filter');
         if (sClass) { sClass.value = currentUser.kelasDiampu; sClass.disabled = true; }
@@ -867,7 +883,6 @@
     function switchView(viewId) {
       if (viewId !== 'scan' && isCameraActive) stopCamera();
 
-      // Validasi Proteksi Pindah Halaman Berdasarkan Role
       const role = currentUser ? currentUser.ID : 'Administrator';
       const navItem = allNavItems.find(n => n.id === viewId);
       if (navItem && !navItem.roles.includes(role)) {
@@ -895,6 +910,74 @@
       const now = new Date();
       const lc = document.getElementById('live-clock'); if (lc) lc.innerText = now.toLocaleTimeString('id-ID');
       const cd = document.getElementById('current-date-display'); if (cd) cd.innerText = now.toLocaleDateString('id-ID', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    }
+
+    /* ============ DASHBOARD STATS & CHART ============ */
+    function updateDashboardStats() {
+      const today = getTodayLocalDateStr();
+      const todayLogs = attendanceLogs.filter(l => getLogDate(l) === today);
+
+      const totalPeople = students.length + teachers.length;
+      const hadirCount = todayLogs.filter(l => l.status === 'Hadir' || l.status === 'Pulang').length;
+      const izinCount = todayLogs.filter(l => l.status === 'Izin' || l.status === 'Sakit').length;
+      const alfaCount = Math.max(0, totalPeople - (hadirCount + izinCount));
+
+      document.getElementById('stat-total-siswa').innerText = totalPeople;
+      document.getElementById('stat-hadir').innerText = hadirCount;
+      document.getElementById('stat-izin').innerText = izinCount;
+      document.getElementById('stat-alpa').innerText = alfaCount;
+
+      const pct = totalPeople > 0 ? Math.round((hadirCount / totalPeople) * 100) : 0;
+      document.getElementById('stat-hadir-pct').innerText = `${pct}% dari total`;
+
+      updatePieChart(hadirCount, izinCount, alfaCount);
+    }
+
+    function initChart() {
+      const ctx = document.getElementById('attendancePieChart');
+      if (!ctx) return;
+      pieChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Hadir', 'Izin/Sakit', 'Alfa/Belum'],
+          datasets: [{
+            data: [0, 0, 0],
+            backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+        }
+      });
+    }
+
+    function updatePieChart(hadir, izin, alfa) {
+      if (pieChartInstance) {
+        pieChartInstance.data.datasets[0].data = [hadir, izin, alfa];
+        pieChartInstance.update();
+      }
+    }
+
+    function renderRecentTable() {
+      const tbody = document.getElementById('dashboard-recent-table');
+      if (!tbody) return;
+      const recent = attendanceLogs.slice(0, 5);
+      if (recent.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Belum ada aktivitas absensi hari ini.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = recent.map(l => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-6 py-3.5 font-semibold text-slate-700">${l.time || '-'}</td>
+          <td class="px-6 py-3.5 font-mono text-xs">${l.nisn}</td>
+          <td class="px-6 py-3.5 font-bold text-slate-800">${l.nama}</td>
+          <td class="px-6 py-3.5"><span class="px-2 py-1 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-xs">${l.jenisAbsen}</span></td>
+          <td class="px-6 py-3.5"><span class="px-2 py-1 rounded-lg text-xs font-bold ${l.status === 'Hadir' || l.status === 'Pulang' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${l.status}</span></td>
+          <td class="px-6 py-3.5 text-xs font-semibold">${l.peran}</td>
+        </tr>`).join('');
     }
 
     /* ============ KAMERA SCANNER ============ */
@@ -1006,7 +1089,6 @@
         return;
       }
 
-      // Restriksi Kepala Sekolah: Tidak bisa memproses absensi siswa
       if (currentUser && currentUser.ID === 'Kepala Sekolah' && student) {
         showToast(`Akses Kepala Sekolah hanya dapat mengelola data/absensi Guru!`, "error");
         return;
@@ -1408,6 +1490,130 @@
       }
     }
 
+    /* ============ REKAP & BELUM ABSEN ============ */
+    function renderRekapTable() {
+      const tbody = document.getElementById('rekap-table-body');
+      if (!tbody) return;
+
+      const dateVal = document.getElementById('rekap-date-filter')?.value || '';
+      const dateText = document.getElementById('rekap-date-text')?.value.trim().toLowerCase() || '';
+      const nameSearch = document.getElementById('rekap-name-search')?.value.trim().toLowerCase() || '';
+      const roleVal = document.getElementById('rekap-role-filter')?.value || 'ALL';
+      const jenisVal = document.getElementById('rekap-jenis-filter')?.value || 'ALL';
+      const classVal = document.getElementById('rekap-class-filter')?.value || 'ALL';
+
+      const filtered = attendanceLogs.filter(log => {
+        const matchDateVal = !dateVal || getLogDate(log) === dateVal;
+        const matchDateText = !dateText || getLogDate(log).toLowerCase().includes(dateText);
+        const matchName = !nameSearch || (log.nama && log.nama.toLowerCase().includes(nameSearch)) || (log.nisn && log.nisn.toLowerCase().includes(nameSearch));
+        const matchRole = roleVal === 'ALL' || log.peran === roleVal;
+        const matchJenis = jenisVal === 'ALL' || log.jenisAbsen === jenisVal;
+        const matchClass = classVal === 'ALL' || log.kelas === classVal;
+        return matchDateVal && matchDateText && matchName && matchRole && matchJenis && matchClass;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">Tidak ada rekap absensi ditemukan</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(l => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-6 py-3 font-semibold text-slate-700">${l.timestamp || (l.date + ' ' + l.time)}</td>
+          <td class="px-6 py-3 font-mono text-xs">${l.nisn}</td>
+          <td class="px-6 py-3 font-bold text-slate-800">${l.nama}</td>
+          <td class="px-6 py-3"><span class="px-2 py-0.5 bg-slate-100 rounded text-xs">${l.kelas}</span></td>
+          <td class="px-6 py-3"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-xs">${l.jenisAbsen}</span></td>
+          <td class="px-6 py-3"><span class="px-2.5 py-1 rounded-lg text-xs font-bold ${l.status === 'Hadir' || l.status === 'Pulang' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${l.status}</span></td>
+          <td class="px-6 py-3 text-xs font-bold text-slate-600">${l.peran}</td>
+        </tr>`).join('');
+    }
+
+    function exportRekapCSV() {
+      if (attendanceLogs.length === 0) { alert("Data absensi kosong!"); return; }
+      let csv = "Timestamp,Tanggal,Waktu,ID_NISN_NIP,Nama,Kelas_Jabatan,JenisAbsen,Status,Peran,Metode\n";
+      attendanceLogs.forEach(l => {
+        csv += `"${l.timestamp}","${l.date}","${l.time}","${l.nisn}","${l.nama}","${l.kelas}","${l.jenisAbsen}","${l.status}","${l.peran}","${l.method}"\n`;
+      });
+      const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csv);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Rekap_Absensi_${getTodayLocalDateStr()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function renderBelumAbsenTable() {
+      const tbody = document.getElementById('belum-table-body');
+      if (!tbody) return;
+
+      const filterDateEl = document.getElementById('belum-date-filter');
+      if (filterDateEl && !filterDateEl.value) {
+        filterDateEl.value = getTodayLocalDateStr();
+      }
+      const targetDate = filterDateEl ? filterDateEl.value : getTodayLocalDateStr();
+      const targetClass = document.getElementById('belum-class-filter')?.value || 'ALL';
+      const targetJenis = document.getElementById('belum-jenis-filter')?.value || 'Masuk Sekolah';
+      const targetRole = document.getElementById('belum-role-filter')?.value || 'ALL';
+      const targetSearch = document.getElementById('belum-name-search')?.value.trim().toLowerCase() || '';
+
+      const alreadySet = new Set();
+      attendanceLogs.forEach(log => {
+        if (getLogDate(log) === targetDate && getLogJenis(log).toLowerCase() === targetJenis.toLowerCase()) {
+          alreadySet.add(getLogId(log));
+        }
+      });
+
+      let unabsentList = [];
+
+      if (targetRole === 'ALL' || targetRole === 'Siswa') {
+        students.forEach(s => {
+          const id = String(s.nisn || '').trim();
+          if (!alreadySet.has(id)) {
+            unabsentList.push({ id: id, nama: s.nama, sub: s.kelas, peran: 'Siswa' });
+          }
+        });
+      }
+
+      if (targetRole === 'ALL' || targetRole === 'Guru') {
+        teachers.forEach(g => {
+          const id = String(g.nip || '').trim();
+          if (!alreadySet.has(id)) {
+            unabsentList.push({ id: id, nama: g.nama, sub: g.jabatan || 'Guru', peran: 'Guru' });
+          }
+        });
+      }
+
+      const filtered = unabsentList.filter(item => {
+        const matchClass = targetClass === 'ALL' || item.sub === targetClass;
+        const matchSearch = !targetSearch || item.nama.toLowerCase().includes(targetSearch) || item.id.toLowerCase().includes(targetSearch);
+        return matchClass && matchSearch;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400">Semua telah mengisi absensi [${targetJenis}] pada tanggal ini.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(item => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-6 py-3 font-mono text-xs font-bold text-slate-700">${item.id}</td>
+          <td class="px-6 py-3 font-bold text-slate-800">${item.nama}</td>
+          <td class="px-6 py-3"><span class="px-2.5 py-1 bg-slate-100 rounded-lg text-xs font-semibold">${item.sub}</span></td>
+          <td class="px-6 py-3 text-xs font-bold text-slate-600">${item.peran}</td>
+          <td class="px-6 py-3 text-center space-x-1">
+            <button onclick="manualAbsenFromBelum('${item.id}', 'Hadir', '${targetJenis}', '${targetDate}')" class="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700">Hadir</button>
+            <button onclick="manualAbsenFromBelum('${item.id}', 'Izin', '${targetJenis}', '${targetDate}')" class="px-2.5 py-1 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600">Izin</button>
+            <button onclick="manualAbsenFromBelum('${item.id}', 'Sakit', '${targetJenis}', '${targetDate}')" class="px-2.5 py-1 bg-rose-500 text-white rounded-lg text-xs font-bold hover:bg-rose-600">Sakit</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    function manualAbsenFromBelum(idCode, status, jenis, dateStr) {
+      processAttendanceScan(idCode, 'Manual Dashboard', status, jenis, dateStr);
+    }
+
     /* ============ PROFIL & PERIODE ============ */
     async function saveSchoolProfileForm(e) {
       e.preventDefault();
@@ -1571,310 +1777,26 @@
                 <div id="qrcode-${idx}" class="w-[66px] h-[66px] flex items-center justify-center"></div>
               </div>
             </div>
-
-            <div class="bg-slate-50 border-t border-slate-100 px-3 py-1 flex justify-between items-center text-[8px] relative z-10">
-              <span class="font-black text-slate-700">
-                NPSN: <span class="text-indigo-600 font-bold">${schoolProfile.npsn}</span>
-              </span>
-              <span class="font-extrabold text-indigo-700 uppercase tracking-wider text-[7px]">
-                Absensi QR System
-              </span>
-            </div>
-
-          </div>
-        `;
+          </div>`;
       }).join('');
 
-      list.forEach((item, idx) => {
-        const qrEl = document.getElementById(`qrcode-${idx}`);
-        if (qrEl) {
-          qrEl.innerHTML = '';
-          new QRCode(qrEl, {
-            text: String(item.id),
-            width: 66,
-            height: 66,
-            correctLevel: QRCode.CorrectLevel.H
-          });
-        }
-      });
-    }
-
-    function getTodayLocalDateStr() {
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    }
-
-    /* ============ DASHBOARD STATS ============ */
-    function updateDashboardStats() {
-      const todayStr = getTodayLocalDateStr();
-
-      let validStudents = students;
-      let validTeachers = teachers;
-
-      // Restriksi data statistik berdasarkan Role
-      if (currentUser && currentUser.ID === 'Kepala Sekolah') {
-        validStudents = []; // Kepala Sekolah tidak melihat statistik siswa
-      } else if (currentUser && currentUser.ID === 'Wali Kelas' && currentUser.kelasDiampu) {
-        validStudents = students.filter(s => s.kelas === currentUser.kelasDiampu);
-        validTeachers = []; // Wali Kelas hanya memfokuskan statistik siswa kelasnya
-      }
-
-      const validIds = [
-        ...validStudents.map(s => String(s.nisn).trim()),
-        ...validTeachers.map(g => String(g.nip).trim())
-      ];
-
-      const todayLogs = attendanceLogs.filter(l => {
-        return getLogDate(l) === todayStr && getLogJenis(l) === 'Masuk Sekolah' && validIds.includes(getLogId(l));
-      });
-      
-      const totalCount = validStudents.length + validTeachers.length;
-      const hadirCount = todayLogs.filter(l => l.status === 'Hadir' || l.status === 'Terlambat').length;
-      const izinCount = todayLogs.filter(l => l.status === 'Izin' || l.status === 'Sakit').length;
-      const alfaCount = todayLogs.filter(l => l.status === 'Alfa').length;
-      const belumCount = Math.max(0, totalCount - (hadirCount + izinCount + alfaCount));
-
-      if (document.getElementById('stat-total-siswa')) document.getElementById('stat-total-siswa').innerText = totalCount;
-      if (document.getElementById('stat-hadir')) document.getElementById('stat-hadir').innerText = hadirCount;
-      if (document.getElementById('stat-izin')) document.getElementById('stat-izin').innerText = izinCount;
-      if (document.getElementById('stat-alpa')) document.getElementById('stat-alpa').innerText = alfaCount + belumCount;
-
-      const pct = totalCount > 0 ? Math.round((hadirCount / totalCount) * 100) : 0;
-      if (document.getElementById('stat-hadir-pct')) document.getElementById('stat-hadir-pct').innerText = `${pct}% dari total`;
-
-      initChart(hadirCount, izinCount, alfaCount + belumCount);
-    }
-
-    function initChart(hadir = 0, izin = 0, alpa = 0) {
-      const ctx = document.getElementById('attendancePieChart');
-      if (!ctx) return;
-      if (pieChartInstance) pieChartInstance.destroy();
-
-      pieChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Hadir', 'Izin/Sakit', 'Alfa/Belum'],
-          datasets: [{
-            data: [hadir, izin, alpa],
-            backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'],
-            borderWidth: 0
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom' } }
-        }
-      });
-    }
-
-    function renderRecentTable() {
-      const tbody = document.getElementById('dashboard-recent-table');
-      if (!tbody) return;
-
-      const todayStr = getTodayLocalDateStr();
-      let todayRecent = attendanceLogs.filter(l => getLogDate(l) === todayStr);
-
-      // Filter Role untuk Aktivitas Absensi Terbaru
-      if (currentUser && currentUser.ID === 'Kepala Sekolah') {
-        todayRecent = todayRecent.filter(l => l.peran === 'Guru');
-      } else if (currentUser && currentUser.ID === 'Wali Kelas' && currentUser.kelasDiampu) {
-        todayRecent = todayRecent.filter(l => l.peran === 'Siswa' && l.kelas === currentUser.kelasDiampu);
-      }
-
-      if (todayRecent.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 font-medium">Belum ada aktivitas absensi hari ini.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = todayRecent.slice(0, 5).map(l => `
-        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.time || l.timestamp || '-'}</td>
-          <td class="px-6 py-3.5 font-bold font-mono text-slate-700">${getLogId(l) || l.nisn || '-'}</td>
-          <td class="px-6 py-3.5 font-bold text-slate-800">${l.nama || '-'}</td>
-          <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">${getLogJenis(l)}</span></td>
-          <td class="px-6 py-3.5">${getBadgeStatus(l.status)}</td>
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.peran || 'Siswa'} (${l.kelas || '-'})</td>
-        </tr>
-      `).join('');
-    }
-
-    function getBadgeStatus(status) {
-      if (status === 'Hadir') return `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold">Hadir</span>`;
-      if (status === 'Terlambat') return `<span class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-xs font-bold">Terlambat</span>`;
-      if (status === 'Alfa') return `<span class="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-lg text-xs font-bold">Alfa</span>`;
-      if (status === 'Izin' || status === 'Sakit') return `<span class="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-lg text-xs font-bold">${status}</span>`;
-      if (status === 'Pulang') return `<span class="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-bold">Pulang</span>`;
-      return `<span class="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg text-xs font-bold">${status}</span>`;
-    }
-
-    /* ============ REKAP ABSENSI ============ */
-    function renderRekapTable() {
-      const tbody = document.getElementById('rekap-table-body');
-      if (!tbody) return;
-
-      const dateFilterInput = document.getElementById('rekap-date-filter');
-      const todayStr = getTodayLocalDateStr();
-
-      if (dateFilterInput && !dateFilterInput.value) {
-        dateFilterInput.value = todayStr;
-      }
-
-      const dateFilter = dateFilterInput?.value || todayStr;
-      const dateText = document.getElementById('rekap-date-text')?.value.trim() || "";
-      const nameSearch = document.getElementById('rekap-name-search')?.value.toLowerCase().trim() || "";
-      let roleFilter = document.getElementById('rekap-role-filter')?.value || "ALL";
-      let classFilter = document.getElementById('rekap-class-filter')?.value || "ALL";
-      const jenisFilter = document.getElementById('rekap-jenis-filter')?.value || "ALL";
-
-      // Override Filter Sesuai Peran User Login
-      if (currentUser && currentUser.ID === 'Kepala Sekolah') {
-        roleFilter = 'Guru';
-      } else if (currentUser && currentUser.ID === 'Wali Kelas') {
-        roleFilter = 'Siswa';
-        if (currentUser.kelasDiampu) classFilter = currentUser.kelasDiampu;
-      }
-
-      const normalizeDate = (dStr) => {
-        if (!dStr) return "";
-        let str = String(dStr).trim();
-        if (str.includes('/')) {
-          const parts = str.split('/');
-          if (parts.length === 3) {
-            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-          }
-        }
-        return str;
-      };
-
-      const filtered = attendanceLogs.filter(l => {
-        const logDate = normalizeDate(getLogDate(l));
-        const mDate = !dateFilter || logDate === normalizeDate(dateFilter);
-        const mDateText = !dateText || logDate.includes(dateText);
-        const mName = !nameSearch || 
-                      (l.nama && l.nama.toLowerCase().includes(nameSearch)) || 
-                      (getLogId(l) && getLogId(l).toLowerCase().includes(nameSearch));
-        const mRole = roleFilter === 'ALL' || (l.peran && l.peran.toLowerCase() === roleFilter.toLowerCase());
-        const mJenis = jenisFilter === 'ALL' || getLogJenis(l) === jenisFilter;
-        const mClass = classFilter === 'ALL' || l.kelas === classFilter;
-
-        return mDate && mDateText && mName && mRole && mJenis && mClass;
-      });
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400 font-medium">Belum ada log absensi untuk kriteria terpilih.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = filtered.map(l => `
-        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.timestamp || `${l.date} ${l.time}`}</td>
-          <td class="px-6 py-3.5 font-bold font-mono text-slate-700">${getLogId(l) || l.nisn || '-'}</td>
-          <td class="px-6 py-3.5 font-bold text-slate-800">${l.nama || '-'}</td>
-          <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">${l.kelas || '-'}</span></td>
-          <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">${getLogJenis(l)}</span></td>
-          <td class="px-6 py-3.5">${getBadgeStatus(l.status)}</td>
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.peran || 'Siswa'}</td>
-        </tr>
-      `).join('');
-    }
-
-    function exportRekapCSV() {
-      if (attendanceLogs.length === 0) { alert("Tidak ada data untuk diekspor!"); return; }
-      let csv = "Timestamp,Tanggal,Waktu,ID_NISN_NIP,Nama,Kelas_Jabatan,Jenis_Sesi,Status,Peran,Metode\n";
-      attendanceLogs.forEach(l => {
-        csv += `"${l.timestamp}","${l.date}","${l.time}","${l.nisn}","${l.nama}","${l.kelas}","${l.jenisAbsen}","${l.status}","${l.peran}","${l.method}"\n`;
-      });
-      const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csv);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Rekap_Absensi_${getTodayLocalDateStr()}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    /* ============ BELUM ABSEN ============ */
-    function renderBelumAbsenTable() {
-      const tbody = document.getElementById('belum-table-body');
-      if (!tbody) return;
-
-      const dateFilterInput = document.getElementById('belum-date-filter');
-      const todayStr = getTodayLocalDateStr();
-
-      if (dateFilterInput && !dateFilterInput.value) {
-        dateFilterInput.value = todayStr;
-      }
-
-      const targetDate = dateFilterInput?.value || todayStr;
-      let targetClass = document.getElementById('belum-class-filter')?.value || "ALL";
-      const targetJenis = document.getElementById('belum-jenis-filter')?.value || "Masuk Sekolah";
-      let targetRole = document.getElementById('belum-role-filter')?.value || "ALL";
-      const searchName = document.getElementById('belum-name-search')?.value.toLowerCase().trim() || "";
-
-      // Override Restriksi Role
-      if (currentUser && currentUser.ID === 'Kepala Sekolah') {
-        targetRole = 'Guru';
-      } else if (currentUser && currentUser.ID === 'Wali Kelas') {
-        targetRole = 'Siswa';
-        if (currentUser.kelasDiampu) targetClass = currentUser.kelasDiampu;
-      }
-
-      const attendedIds = new Set(
-        attendanceLogs
-          .filter(l => getLogDate(l) === targetDate && getLogJenis(l) === targetJenis)
-          .map(l => getLogId(l))
-      );
-
-      let unabsentList = [];
-
-      if (targetRole === 'ALL' || targetRole === 'Siswa') {
-        students.forEach(s => {
-          const id = String(s.nisn).trim();
-          if (!attendedIds.has(id)) {
-            const matchClass = (targetClass === 'ALL' || s.kelas === targetClass);
-            const matchName = !searchName || s.nama.toLowerCase().includes(searchName) || id.toLowerCase().includes(searchName);
-            if (matchClass && matchName) {
-              unabsentList.push({ id: id, nama: s.nama, sub: s.kelas, peran: 'Siswa' });
-            }
+      // Generate QR Code untuk masing-masing kartu
+      setTimeout(() => {
+        list.forEach((item, idx) => {
+          const el = document.getElementById(`qrcode-${idx}`);
+          if (el) {
+            el.innerHTML = '';
+            new QRCode(el, {
+              text: String(item.id || ''),
+              width: 66,
+              height: 66,
+              colorDark: "#0f172a",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.H
+            });
           }
         });
-      }
-
-      if (targetRole === 'ALL' || targetRole === 'Guru') {
-        teachers.forEach(g => {
-          const id = String(g.nip).trim();
-          if (!attendedIds.has(id)) {
-            const matchName = !searchName || g.nama.toLowerCase().includes(searchName) || id.toLowerCase().includes(searchName);
-            if (matchName) {
-              unabsentList.push({ id: id, nama: g.nama, sub: g.jabatan || 'Guru', peran: 'Guru' });
-            }
-          }
-        });
-      }
-
-      if (unabsentList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-emerald-600 font-bold">Semua data terkonfirmasi sudah absensi [${targetJenis}] pada tanggal ini.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = unabsentList.map(item => `
-        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-          <td class="px-6 py-3.5 font-bold font-mono text-slate-700">${item.id}</td>
-          <td class="px-6 py-3.5 font-bold text-slate-800">${item.nama}</td>
-          <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">${item.sub}</span></td>
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${item.peran}</td>
-          <td class="px-6 py-3.5 text-center space-x-1">
-            <button onclick="processAttendanceScan('${item.id}', 'Manual Absen', 'Hadir', '${targetJenis}', '${targetDate}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold text-xs rounded-lg shadow-xs hover:bg-emerald-700"><i class="fa-solid fa-check mr-1"></i> Hadir</button>
-            <button onclick="processAttendanceScan('${item.id}', 'Manual Absen', 'Izin', '${targetJenis}', '${targetDate}')" class="px-2.5 py-1 bg-amber-500 text-white font-bold text-xs rounded-lg shadow-xs hover:bg-amber-600">Izin</button>
-            <button onclick="processAttendanceScan('${item.id}', 'Manual Absen', 'Sakit', '${targetJenis}', '${targetDate}')" class="px-2.5 py-1 bg-sky-500 text-white font-bold text-xs rounded-lg shadow-xs hover:bg-sky-600">Sakit</button>
-            <button onclick="processAttendanceScan('${item.id}', 'Manual Absen', 'Alfa', '${targetJenis}', '${targetDate}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold text-xs rounded-lg shadow-xs hover:bg-rose-700">Alfa</button>
-          </td>
-        </tr>
-      `).join('');
+      }, 100);
     }
   </script>
 </body>
