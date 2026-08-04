@@ -822,6 +822,7 @@
 
       if (!student && !teacher) {
         showToast(`ID / NISN / NIP [${idCode}] tidak terdaftar!`, "error");
+        renderDuplicateResultCard("Data Tidak Ditemukan", idCode, "Siswa/Guru tidak terdaftar di sistem");
         return;
       }
 
@@ -834,6 +835,7 @@
       const targetDate = customDate || getTodayLocalDateStr();
       const targetJenis = customJenis || currentJenisAbsen;
 
+      // Pengecekan Duplikat: Apakah ID ini sudah absen dengan jenis sesi dan tanggal yang sama?
       const already = attendanceLogs.some(log =>
         String(getLogId(log)) === idCode &&
         String(getLogDate(log)) === targetDate &&
@@ -841,7 +843,8 @@
       );
 
       if (already) {
-        showToast(`Ditolak: ${personName} telah mengisi [${targetJenis}] pada tanggal ini!`, "error");
+        const warningMsg = `Scan Ditolak: ${personName} terdeteksi lebih dari satu kali scan untuk sesi [${targetJenis}] pada hari ini!`;
+        showToast(warningMsg, "error");
         renderDuplicateResultCard(personName, idCode, targetJenis);
         return;
       }
@@ -891,10 +894,10 @@
     function renderDuplicateResultCard(nama, idCode, jenis) {
       document.getElementById('scan-result-card').innerHTML = `
         <div class="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-3xl mb-3 shadow-inner"><i class="fa-solid fa-triangle-exclamation"></i></div>
-        <span class="px-3 py-1 bg-rose-50 text-rose-700 font-bold rounded-full text-xs mb-1 border border-rose-200">Scan Ditolak (Duplikat)</span>
+        <span class="px-3 py-1 bg-rose-50 text-rose-700 font-bold rounded-full text-xs mb-1 border border-rose-200">Scan Ditolak (Sudah Absen)</span>
         <h4 class="font-extrabold text-slate-800 text-lg mt-1">${nama}</h4>
         <p class="text-xs font-semibold text-slate-500 mb-1">ID: ${idCode}</p>
-        <p class="text-xs font-bold text-rose-600">Sudah mengisi absen ${jenis} hari ini!</p>`;
+        <p class="text-xs font-bold text-rose-600 mt-1">Terdeteksi lebih dari satu kali scan! Absensi sesi [${jenis}] sudah tercatat sebelumnya.</p>`;
     }
 
     /* ============ UPLOAD & IMPORT EXCEL ============ */
