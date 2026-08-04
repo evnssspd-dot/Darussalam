@@ -812,10 +812,23 @@
       if (idVal) { processAttendanceScan(idVal, 'Manual Input'); input.value = ''; }
     }
 
+   /* ============ STATE & VARIABEL PENDUKUNG SCAN ============ */
+    // Variabel untuk melacak scan terakhir agar tidak terjadi spam/bentrok notif dalam beberapa detik
+    let lastScannedId = null;
+    let lastScannedTime = 0;
+    const SCAN_COOLDOWN_MS = 3000; // Jeda 3 detik agar notif sukses tidak langsung tertutup
+
     /* ============ PROSES ABSENSI & ANTI-DUPLIKAT ============ */
     async function processAttendanceScan(idCodeRaw, method, customStatus = null, customJenis = null, customDate = null) {
       const idCode = String(idCodeRaw || '').trim();
       if (!idCode) { showToast('ID kosong', 'error'); return; }
+
+      const nowTime = Date.now();
+      
+      // Mencegah spam scan cepat dari orang yang sama dalam rentang waktu cooldown (misal kamera masih nyala lalu terscan 2x beruntun)
+      if (idCode === lastScannedId && (nowTime - lastScannedTime) < SCAN_COOLDOWN_MS) {
+        return; // Abaikan scan beruntun yang terlalu cepat dalam hitungan detik yang sama
+      }
 
       const student = students.find(s => String(s.nisn || '').trim() === idCode);
       const teacher = teachers.find(g => String(g.nip || '').trim() === idCode);
@@ -835,7 +848,7 @@
       const targetDate = customDate || getTodayLocalDateStr();
       const targetJenis = customJenis || currentJenisAbsen;
 
-      // Pengecekan Duplikat: Apakah ID ini sudah absen dengan jenis sesi dan tanggal yang sama?
+      // Cek apakah di database/log hari ini sudah pernah absen dengan sesi yang sama
       const already = attendanceLogs.some(log =>
         String(getLogId(log)) === idCode &&
         String(getLogDate(log)) === targetDate &&
@@ -843,11 +856,19 @@
       );
 
       if (already) {
-        const warningMsg = `Scan Ditolak: ${personName} terdeteksi lebih dari satu kali scan untuk sesi [${targetJenis}] pada hari ini!`;
+        // Update state agar tercatat sedang memproses duplikat
+        lastScannedId = idCode;
+        lastScannedTime = nowTime;
+
+        const warningMsg = `Scan Ditolak: ${personName} sudah melakukan absen [${targetJenis}] hari ini!`;
         showToast(warningMsg, "error");
         renderDuplicateResultCard(personName, idCode, targetJenis);
         return;
       }
+
+      // Jika lolos (belum pernah absen hari ini), set sebagai scan sukses terakhir
+      lastScannedId = idCode;
+      lastScannedTime = nowTime;
 
       let statusToSave = customStatus;
       if (!statusToSave) {
@@ -869,8 +890,15 @@
 
       attendanceLogs.unshift(Object.assign({}, logEntry));
       normalizeAttendanceLogs();
-      updateDashboardStats(); renderRecentTable(); renderRekapTable(); renderBelumAbsenTable(); renderScanResultCard(logEntry);
+      updateDashboardStats(); 
+      renderRecentTable(); 
+      renderRekapTable(); 
+      renderBelumAbsenTable(); 
+      
+      // Tampilkan kartu sukses (Hijau)
+      renderScanResultCard(logEntry);
       showToast(`Absensi [${targetJenis} - ${statusToSave}] Berhasil: ${personName}`);
+      
       showSyncBadge("Menyimpan ke Stein HQ...", "loading");
 
       try {
@@ -897,7 +925,7 @@
         <span class="px-3 py-1 bg-rose-50 text-rose-700 font-bold rounded-full text-xs mb-1 border border-rose-200">Scan Ditolak (Sudah Absen)</span>
         <h4 class="font-extrabold text-slate-800 text-lg mt-1">${nama}</h4>
         <p class="text-xs font-semibold text-slate-500 mb-1">ID: ${idCode}</p>
-        <p class="text-xs font-bold text-rose-600 mt-1">Terdeteksi lebih dari satu kali scan! Absensi sesi [${jenis}] sudah tercatat sebelumnya.</p>`;
+        <p class="text-xs font-bold text-rose-600 mt-1">Gagal! ${nama} sudah tercatat melakukan absen [${jenis}] sebelumnya.</p>`;
     }
 
     /* ============ UPLOAD & IMPORT EXCEL ============ */
