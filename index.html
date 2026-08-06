@@ -14,7 +14,7 @@
   <style>
     * { font-family: 'Plus Jakarta Sans', sans-serif; }
     
-    /* Layout Cetak A4 Presisi (6 Kartu per Halaman: 2 Kolom x 3 Baris) */
+    /* Layout Cetak A4 Presisi (Kartu Format PORTRAIT: Lebar 5.4cm x Tinggi 8.5cm) */
     @media print {
       body * { visibility: hidden; }
       #print-section, #print-section * { visibility: visible; }
@@ -24,13 +24,13 @@
         top: 0;
         width: 210mm;
         display: grid !important;
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 8mm !important;
+        grid-template-columns: repeat(3, 1fr) !important; /* 3 Kolom per baris di kertas A4 portrait */
+        gap: 6mm !important;
         padding: 10mm !important;
       }
       .kts-card {
-        width: 85.6mm !important;
-        height: 53.9mm !important;
+        width: 54mm !important;
+        height: 85mm !important;
         page-break-inside: avoid;
         break-inside: avoid;
         box-shadow: none !important;
@@ -42,7 +42,9 @@
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
-    .kts-card { width: 85.6mm; height: 53.9mm; box-shadow: 0 4px 15px -3px rgba(0,0,0,0.1); }
+    
+    /* Ukuran Tampilan Kartu Portrait di Layar (Lebar 54mm, Tinggi 85mm) */
+    .kts-card { width: 54mm; height: 85mm; box-shadow: 0 4px 15px -3px rgba(0,0,0,0.1); }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col md:flex-row antialiased selection:bg-indigo-500 selection:text-white">
@@ -149,7 +151,7 @@
             </div>
             <div class="relative z-10 flex flex-wrap gap-3">
               <button onclick="switchView('scan')" class="px-6 py-3 bg-white text-indigo-700 hover:bg-indigo-50 font-bold text-sm rounded-xl shadow-lg transition-all flex items-center space-x-2"><i class="fa-solid fa-camera"></i><span>Buka Scanner Kamera</span></button>
-              <button onclick="switchView('kts')" class="px-5 py-3 bg-indigo-500/30 hover:bg-indigo-500/50 text-white font-semibold text-sm rounded-xl border border-white/20 transition-all flex items-center space-x-2"><i class="fa-solid fa-id-card"></i><span>Cetak Kartu A4</span></button>
+              <button onclick="switchView('kts')" class="px-5 py-3 bg-indigo-500/30 hover:bg-indigo-500/50 text-white font-semibold text-sm rounded-xl border border-white/20 transition-all flex items-center space-x-2"><i class="fa-solid fa-id-card"></i><span>Cetak Kartu Portrait</span></button>
             </div>
           </div>
           <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
@@ -231,21 +233,21 @@
         </div>
       </section>
 
-      <!-- CETAK KARTU VIEW (A4 - 6 Kartu) -->
+      <!-- CETAK KARTU VIEW (Portrait Layout) -->
       <section id="view-kts" class="page-view space-y-6 hidden">
         <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
           <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-6 border-b border-slate-100">
-            <div><h3 class="font-bold text-slate-800 text-xl">Cetak Kartu Tanda (Layout A4 - 6 Kartu)</h3><p class="text-xs text-slate-500">Tampilan disesuaikan untuk presisi cetak kertas A4</p></div>
+            <div><h3 class="font-bold text-slate-800 text-xl">Cetak Kartu Tanda (Layout Portrait 5.4 x 8.5 cm)</h3><p class="text-xs text-slate-500">Tampilan disesuaikan untuk cetak kartu bentuk portrait vertikal</p></div>
             <div class="flex flex-wrap items-center gap-3">
               <select id="kts-type-filter" onchange="renderKtsCards()" class="px-3 py-2 bg-slate-50 border rounded-xl text-xs font-semibold">
                 <option value="SISWA">Kartu Siswa (KTS)</option>
                 <option value="GURU">Kartu Guru (KTG)</option>
               </select>
               <select id="kts-class-filter" onchange="renderKtsCards()" class="px-3 py-2 bg-slate-50 border rounded-xl text-xs font-semibold"></select>
-              <button onclick="window.print()" class="px-5 py-2 bg-indigo-600 text-white font-bold text-xs rounded-xl shadow-md"><i class="fa-solid fa-print mr-1"></i> Cetak A4</button>
+              <button onclick="window.print()" class="px-5 py-2 bg-indigo-600 text-white font-bold text-xs rounded-xl shadow-md"><i class="fa-solid fa-print mr-1"></i> Cetak Kartu</button>
             </div>
           </div>
-          <div id="print-section" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 justify-items-center"></div>
+          <div id="print-section" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 justify-items-center"></div>
         </div>
       </section>
 
@@ -545,7 +547,7 @@
     const navItems = [
       { id:'dashboard', label:'Dashboard', icon:'fa-gauge-high' },
       { id:'scan', label:'Scan QR Code', icon:'fa-camera' },
-      { id:'kts', label:'Cetak Kartu A4', icon:'fa-id-card' },
+      { id:'kts', label:'Cetak Kartu Portrait', icon:'fa-id-card' },
       { id:'siswa', label:'Data Siswa', icon:'fa-users' },
       { id:'guru', label:'Kelola Guru', icon:'fa-user-tie' },
       { id:'kelas', label:'Kelola Kelas', icon:'fa-layer-group' },
@@ -812,22 +814,17 @@
       if (idVal) { processAttendanceScan(idVal, 'Manual Input'); input.value = ''; }
     }
 
-   /* ============ STATE & VARIABEL PENDUKUNG SCAN ============ */
-    // Variabel untuk melacak scan terakhir agar tidak terjadi spam/bentrok notif dalam beberapa detik
     let lastScannedId = null;
     let lastScannedTime = 0;
-    const SCAN_COOLDOWN_MS = 3000; // Jeda 3 detik agar notif sukses tidak langsung tertutup
+    const SCAN_COOLDOWN_MS = 3000;
 
-    /* ============ PROSES ABSENSI & ANTI-DUPLIKAT ============ */
     async function processAttendanceScan(idCodeRaw, method, customStatus = null, customJenis = null, customDate = null) {
       const idCode = String(idCodeRaw || '').trim();
       if (!idCode) { showToast('ID kosong', 'error'); return; }
 
       const nowTime = Date.now();
-      
-      // Mencegah spam scan cepat dari orang yang sama dalam rentang waktu cooldown (misal kamera masih nyala lalu terscan 2x beruntun)
       if (idCode === lastScannedId && (nowTime - lastScannedTime) < SCAN_COOLDOWN_MS) {
-        return; // Abaikan scan beruntun yang terlalu cepat dalam hitungan detik yang sama
+        return;
       }
 
       const student = students.find(s => String(s.nisn || '').trim() === idCode);
@@ -848,7 +845,6 @@
       const targetDate = customDate || getTodayLocalDateStr();
       const targetJenis = customJenis || currentJenisAbsen;
 
-      // Cek apakah di database/log hari ini sudah pernah absen dengan sesi yang sama
       const already = attendanceLogs.some(log =>
         String(getLogId(log)) === idCode &&
         String(getLogDate(log)) === targetDate &&
@@ -856,7 +852,6 @@
       );
 
       if (already) {
-        // Update state agar tercatat sedang memproses duplikat
         lastScannedId = idCode;
         lastScannedTime = nowTime;
 
@@ -866,7 +861,6 @@
         return;
       }
 
-      // Jika lolos (belum pernah absen hari ini), set sebagai scan sukses terakhir
       lastScannedId = idCode;
       lastScannedTime = nowTime;
 
@@ -895,7 +889,6 @@
       renderRekapTable(); 
       renderBelumAbsenTable(); 
       
-      // Tampilkan kartu sukses (Hijau)
       renderScanResultCard(logEntry);
       showToast(`Absensi [${targetJenis} - ${statusToSave}] Berhasil: ${personName}`);
       
@@ -1316,7 +1309,7 @@
       if (document.getElementById('form-tahun-pelajaran')) document.getElementById('form-tahun-pelajaran').innerHTML = academicYearList.map(t => `<option value="${t}" ${t === academicYear.tahunPelajaran ? 'selected' : ''}>${t}</option>`).join('');
     }
 
-    /* ============ LAYOUT KARTU A4 (6 Kartu per Halaman) ============ */
+    /* ============ LAYOUT KARTU PORTRAIT (5.4 cm x 8.5 cm) ============ */
     function renderKtsCards() {
       const container = document.getElementById('print-section');
       const cardType = document.getElementById('kts-type-filter').value;
@@ -1349,7 +1342,7 @@
         const photoBorder = isSiswa ? 'border-indigo-500' : 'border-amber-500';
 
         const namaStr = item.nama || '-';
-        const nameFontSize = namaStr.length > 18 ? 'text-[9.5px]' : 'text-[11px]';
+        const nameFontSize = namaStr.length > 18 ? 'text-[9px]' : 'text-[10px]';
 
         const defaultPlaceholder = 'https://via.placeholder.com/150x200/e2e8f0/64748b?text=FOTO';
         const fotoSrc = (item.foto && item.foto.trim() !== '') ? item.foto : defaultPlaceholder;
@@ -1358,63 +1351,55 @@
           <div class="kts-card bg-white rounded-2xl flex flex-col justify-between border border-slate-200/80 shadow-md relative overflow-hidden transition hover:shadow-lg">
             <div class="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-indigo-500/10 pointer-events-none"></div>
 
-            <div class="${headerBg} px-3 py-1.5 flex items-center space-x-2.5 relative z-10">
-              <div class="w-7 h-7 shrink-0 bg-white rounded-lg p-0.5 flex items-center justify-center shadow-xs">
+            <!-- HEADER KARTU PORTRAIT -->
+            <div class="${headerBg} px-2 py-2 flex flex-col items-center text-center relative z-10">
+              <div class="w-6 h-6 shrink-0 bg-white rounded-lg p-0.5 flex items-center justify-center shadow-xs mb-1">
                 <img src="${schoolProfile.logoUrl || 'https://via.placeholder.com/40'}" class="max-w-full max-h-full object-contain" onError="this.src='https://via.placeholder.com/40?text=Logo'">
               </div>
-              <div class="flex-1 min-w-0">
-                <h5 class="text-[10px] font-black uppercase tracking-tight truncate leading-tight">${schoolProfile.namaSekolah}</h5>
-                <div class="flex items-center gap-1.5 mt-0.5">
-                  <span class="text-[7px] font-extrabold ${badgeRoleBg} px-1.5 py-0.2 rounded-full uppercase tracking-wider">
-                    KARTU TANDA ${item.role}
-                  </span>
-                </div>
-              </div>
+              <h5 class="text-[9px] font-black uppercase tracking-tight truncate leading-tight w-full">${schoolProfile.namaSekolah}</h5>
+              <span class="text-[7px] font-extrabold ${badgeRoleBg} px-1.5 py-0.2 rounded-full uppercase tracking-wider mt-0.5">
+                KARTU ${item.role}
+              </span>
             </div>
 
-            <div class="px-3 py-1.5 flex items-center space-x-2.5 relative z-10 my-auto">
-              <div class="shrink-0 rounded-xl border-2 ${photoBorder} overflow-hidden shadow-xs bg-slate-100 flex items-center justify-center" style="width: 60px; height: 76px; min-width: 60px; min-height: 76px;">
+            <!-- KONTEN TENGAH KARTU PORTRAIT -->
+            <div class="px-2 py-1 flex flex-col items-center text-center relative z-10 my-auto space-y-1.5">
+              <div class="shrink-0 rounded-xl border-2 ${photoBorder} overflow-hidden shadow-xs bg-slate-100 flex items-center justify-center" style="width: 52px; height: 64px;">
                 <img 
                   src="${fotoSrc}" 
                   class="w-full h-full object-cover" 
-                  style="width: 100%; height: 100%; object-fit: cover;"
                   onError="this.onerror=null; this.src='${defaultPlaceholder}';"
                 />
               </div>
               
-              <div class="flex-1 min-w-0 space-y-0.5">
+              <div class="w-full space-y-0.5">
                 <p class="${nameFontSize} font-black text-slate-800 leading-tight line-clamp-2 break-words">
                   ${namaStr}
                 </p>
                 
-                <div class="flex items-center gap-1 text-[8px]">
+                <div class="flex items-center justify-center gap-1 text-[8px]">
                   <span class="font-semibold text-slate-400">ID:</span>
                   <span class="font-mono font-bold text-slate-700 bg-slate-100 px-1 py-0.2 rounded">${item.id}</span>
                 </div>
 
-                <div class="text-[8px] flex items-center gap-1">
+                <div class="text-[8px] flex items-center justify-center gap-1">
                   <span class="font-semibold text-slate-400">${isSiswa ? 'Kelas' : 'Jabatan'}:</span>
                   <span class="font-extrabold px-1 py-0.2 rounded border ${subColor}">${item.sub}</span>
-                </div>
-                
-                <div class="pt-0.5">
-                  <span class="inline-block px-1.5 py-0.5 bg-slate-800 text-amber-300 font-extrabold text-[7.5px] rounded-md tracking-tight leading-none">
-                    TA ${academicYear.tahunPelajaran} (${academicYear.semester})
-                  </span>
                 </div>
               </div>
 
               <div class="shrink-0 bg-white p-1 rounded-xl border border-indigo-100 shadow-2xs flex items-center justify-center">
-                <div id="qrcode-${idx}" class="w-[66px] h-[66px] flex items-center justify-center"></div>
+                <div id="qrcode-${idx}" class="w-[60px] h-[60px] flex items-center justify-center"></div>
               </div>
             </div>
 
-            <div class="bg-slate-50 border-t border-slate-100 px-3 py-1 flex justify-between items-center text-[8px] relative z-10">
+            <!-- FOOTER KARTU PORTRAIT -->
+            <div class="bg-slate-50 border-t border-slate-100 px-2 py-1 flex justify-between items-center text-[7px] relative z-10">
               <span class="font-black text-slate-700">
                 NPSN: <span class="text-indigo-600 font-bold">${schoolProfile.npsn}</span>
               </span>
-              <span class="font-extrabold text-indigo-700 uppercase tracking-wider text-[7px]">
-                Absensi QR System
+              <span class="font-extrabold text-indigo-700 uppercase tracking-wider text-[6.5px]">
+                QR System
               </span>
             </div>
 
@@ -1428,8 +1413,8 @@
           qrEl.innerHTML = '';
           new QRCode(qrEl, {
             text: String(item.id),
-            width: 66,
-            height: 66,
+            width: 60,
+            height: 60,
             correctLevel: QRCode.CorrectLevel.H
           });
         }
@@ -1553,27 +1538,25 @@
         
         const mDate = !dateFilter || logDate === normalizeDate(dateFilter);
         const mDateText = !dateText || logDate.includes(dateText);
-        const mName = !nameSearch || 
-                      (l.nama && l.nama.toLowerCase().includes(nameSearch)) || 
-                      (getLogId(l) && getLogId(l).toLowerCase().includes(nameSearch));
+        const mName = !nameSearch || (l.nama && l.nama.toLowerCase().includes(nameSearch)) || (l.nisn && String(l.nisn).toLowerCase().includes(nameSearch));
         const mRole = roleFilter === 'ALL' || (l.peran && l.peran.toLowerCase() === roleFilter.toLowerCase());
-        const mJenis = jenisFilter === 'ALL' || getLogJenis(l) === jenisFilter;
-        const mClass = classFilter === 'ALL' || l.kelas === classFilter;
+        const mJenis = jenisFilter === 'ALL' || (getLogJenis(l).toLowerCase() === jenisFilter.toLowerCase());
+        const mClass = classFilter === 'ALL' || (l.kelas && l.kelas.toLowerCase() === classFilter.toLowerCase());
 
         return mDate && mDateText && mName && mRole && mJenis && mClass;
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400 font-medium">Belum ada log absensi untuk kriteria terpilih.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400 font-medium">Tidak ada data rekap absensi yang cocok.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = filtered.map(l => `
         <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.timestamp || `${l.date} ${l.time}`}</td>
+          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.timestamp || '-'}</td>
           <td class="px-6 py-3.5 font-bold font-mono text-slate-700">${getLogId(l) || l.nisn || '-'}</td>
           <td class="px-6 py-3.5 font-bold text-slate-800">${l.nama || '-'}</td>
-          <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">${l.kelas || '-'}</span></td>
+          <td class="px-6 py-3.5 text-xs text-slate-600 font-semibold">${l.kelas || '-'}</td>
           <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">${getLogJenis(l)}</span></td>
           <td class="px-6 py-3.5">${getBadgeStatus(l.status)}</td>
           <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${l.peran || 'Siswa'}</td>
@@ -1581,52 +1564,7 @@
       `).join('');
     }
 
-    function exportRekapCSV() {
-  if (attendanceLogs.length === 0) { 
-    alert("Data absensi kosong!"); 
-    return; 
-  }
-
-  // Header CSV
-  let csv = "Timestamp,Tanggal,Waktu,ID_NISN_NIP,Nama,Kelas_Jabatan,Jenis_Sesi,Status,Peran,Metode\n";
-
-  attendanceLogs.forEach(l => {
-    // Sanitasi data agar null/undefined tidak menyebabkan error
-    const timestamp = (l.timestamp || '').toString().replace(/"/g, '""');
-    const date = (l.date || '').toString().replace(/"/g, '""');
-    const time = (l.time || '').toString().replace(/"/g, '""');
-    const nama = (l.nama || '').toString().replace(/"/g, '""');
-    const kelas = (l.kelas || '').toString().replace(/"/g, '""');
-    const jenisAbsen = (l.jenisAbsen || '').toString().replace(/"/g, '""');
-    const status = (l.status || '').toString().replace(/"/g, '""');
-    const peran = (l.peran || '').toString().replace(/"/g, '""');
-    const method = (l.method || '').toString().replace(/"/g, '""');
-
-    // PERBAIKAN UTAMA: Format ID dibungkus `="ID"` agar dipaksa menjadi teks murni oleh Excel
-    const nisnRaw = (l.nisn || '').toString().replace(/"/g, '""');
-    const formattedId = `="${nisnRaw}"`;
-
-    csv += `"${timestamp}","${date}","${time}",${formattedId},"${nama}","${kelas}","${jenisAbsen}","${status}","${peran}","${method}"\n`;
-  });
-
-  // Menggunakan Blob + BOM (\uFEFF) alih-alih encodeURI agar aman untuk data ukuran besar dan UTF-8 di Excel
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `Rekap_Absensi_${getTodayLocalDateStr()}.csv`);
-  link.style.visibility = "hidden";
-  
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  // Membersihkan memori URL blob
-  URL.revokeObjectURL(url);
-}
-
-    /* ============ PERBAIKAN: TABEL BELUM ABSEN & TOMBOL AKSI MANUAL ============ */
+    /* ============ BELUM ABSEN ============ */
     function renderBelumAbsenTable() {
       const tbody = document.getElementById('belum-table-body');
       if (!tbody) return;
@@ -1638,102 +1576,109 @@
         dateFilterInput.value = todayStr;
       }
 
-      const targetDate = dateFilterInput?.value || todayStr;
-      const targetClass = document.getElementById('belum-class-filter')?.value || 'ALL';
-      const targetJenis = document.getElementById('belum-jenis-filter')?.value || 'Masuk Sekolah';
-      const targetRole = document.getElementById('belum-role-filter')?.value || 'ALL';
-      const searchName = document.getElementById('belum-name-search')?.value.toLowerCase().trim() || '';
+      const dateFilter = dateFilterInput?.value || todayStr;
+      const classFilter = document.getElementById('belum-class-filter')?.value || 'ALL';
+      const jenisFilter = document.getElementById('belum-jenis-filter')?.value || 'Masuk Sekolah';
+      const roleFilter = document.getElementById('belum-role-filter')?.value || 'ALL';
+      const nameSearch = document.getElementById('belum-name-search')?.value.toLowerCase().trim() || '';
 
-      // Gabungkan Siswa dan Guru
-      let allUsers = [];
-      if (targetRole === 'ALL' || targetRole === 'Siswa') {
-        allUsers.push(...students.map(s => ({ id: String(s.nisn).trim(), nama: s.nama, sub: s.kelas, role: 'Siswa' })));
-      }
-      if (targetRole === 'ALL' || targetRole === 'Guru') {
-        allUsers.push(...teachers.map(g => ({ id: String(g.nip).trim(), nama: g.nama, sub: g.jabatan || 'Guru', role: 'Guru' })));
-      }
+      const normalizeDate = (dStr) => {
+        if (!dStr) return "";
+        let str = String(dStr).trim();
+        if (str.includes('/')) {
+          const parts = str.split('/');
+          if (parts.length === 3) {
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          }
+        }
+        return str;
+      };
 
-      // Ambil ID yang SUDAH absen di tanggal & sesi terpilih
-      const checkedSet = new Set(
+      const attendedIdsToday = new Set(
         attendanceLogs
-          .filter(l => getLogDate(l) === targetDate && getLogJenis(l) === targetJenis)
-          .map(l => String(getLogId(l)).trim())
+          .filter(l => {
+            const lDate = normalizeDate(getLogDate(l));
+            const lJenis = String(getLogJenis(l)).trim().toLowerCase();
+            return lDate === normalizeDate(dateFilter) && lJenis === jenisFilter.toLowerCase();
+          })
+          .map(l => String(getLogId(l)))
       );
 
-      // Filter pengguna yang BELUM mengisi absen
-      const unabsented = allUsers.filter(u => {
-        const notDone = !checkedSet.has(u.id);
-        const matchClass = targetClass === 'ALL' || u.sub === targetClass;
-        const matchSearch = !searchName || u.nama.toLowerCase().includes(searchName) || u.id.toLowerCase().includes(searchName);
-        return notDone && matchClass && matchSearch;
+      let allPeople = [];
+      if (roleFilter === 'ALL' || roleFilter === 'Siswa') {
+        students.forEach(s => {
+          allPeople.push({ id: String(s.nisn), nama: s.nama, sub: s.kelas, peran: 'Siswa' });
+        });
+      }
+      if (roleFilter === 'ALL' || roleFilter === 'Guru') {
+        teachers.forEach(g => {
+          allPeople.push({ id: String(g.nip), nama: g.nama, sub: g.jabatan || 'Guru', peran: 'Guru' });
+        });
+      }
+
+      const belumList = allPeople.filter(p => {
+        const notAttended = !attendedIdsToday.has(p.id);
+        const matchClass = classFilter === 'ALL' || (p.peran === 'Siswa' && p.sub === classFilter) || p.peran === 'Guru';
+        const matchName = !nameSearch || p.nama.toLowerCase().includes(nameSearch) || p.id.toLowerCase().includes(nameSearch);
+        return notAttended && matchClass && matchName;
       });
 
-      if (unabsented.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-emerald-600 font-bold"><i class="fa-solid fa-circle-check mr-2"></i>Semua pengguna telah mengisi absensi untuk kriteria terpilih!</td></tr>`;
+      if (belumList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-medium">Semua orang sudah absen pada sesi ini! 🎉</td></tr>`;
         return;
       }
 
-      // Render Baris Tabel beserta Tombol Aksi Manual (Hadir, Izin, Sakit, Alfa)
-      tbody.innerHTML = unabsented.map(u => `
+      tbody.innerHTML = belumList.map(p => `
         <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-          <td class="px-6 py-3.5 font-bold font-mono text-slate-700">${u.id}</td>
-          <td class="px-6 py-3.5 font-bold text-slate-800">${u.nama}</td>
-          <td class="px-6 py-3.5"><span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">${u.sub}</span></td>
-          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${u.role}</td>
-          <td class="px-6 py-3.5 text-center">
-            <div class="flex items-center justify-center gap-1.5 flex-wrap">
-              <button onclick="handleActionManual('${u.id}', 'Hadir', '${targetJenis}', '${targetDate}')" title="Catat Hadir" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center gap-1">
-                <i class="fa-solid fa-check text-[10px]"></i> Hadir
-              </button>
-              <button onclick="handleActionManual('${u.id}', 'Izin', '${targetJenis}', '${targetDate}')" title="Catat Izin" class="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-600 text-sky-700 hover:text-white border border-sky-200 rounded-xl text-xs font-bold transition flex items-center gap-1">
-                <i class="fa-solid fa-envelope text-[10px]"></i> Izin
-              </button>
-              <button onclick="handleActionManual('${u.id}', 'Sakit', '${targetJenis}', '${targetDate}')" title="Catat Sakit" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1">
-                <i class="fa-solid fa-notes-medical text-[10px]"></i> Sakit
-              </button>
-              <button onclick="handleActionManual('${u.id}', 'Alfa', '${targetJenis}', '${targetDate}')" title="Catat Alfa" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1">
-                <i class="fa-solid fa-xmark text-[10px]"></i> Alfa
-              </button>
-            </div>
+          <td class="px-6 py-3.5 font-bold font-mono text-slate-700">${p.id}</td>
+          <td class="px-6 py-3.5 font-bold text-slate-800">${p.nama}</td>
+          <td class="px-6 py-3.5"><span class="px-2 py-1 bg-slate-100 rounded text-xs font-bold text-slate-600">${p.sub}</span></td>
+          <td class="px-6 py-3.5 text-xs font-semibold text-slate-500">${p.peran}</td>
+          <td class="px-6 py-3.5 text-center space-x-1">
+            <button onclick="processAttendanceScan('${p.id}', 'Manual Admin', 'Hadir', '${jenisFilter}', '${dateFilter}')" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-xs hover:bg-emerald-700 transition" title="Absenkan Hadir">Hadir</button>
+            <button onclick="processAttendanceScan('${p.id}', 'Manual Admin', 'Izin', '${jenisFilter}', '${dateFilter}')" class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-bold shadow-xs hover:bg-amber-600 transition" title="Absenkan Izin">Izin</button>
+            <button onclick="processAttendanceScan('${p.id}', 'Manual Admin', 'Sakit', '${jenisFilter}', '${dateFilter}')" class="px-3 py-1.5 bg-sky-500 text-white rounded-lg text-xs font-bold shadow-xs hover:bg-sky-600 transition" title="Absenkan Sakit">Sakit</button>
+            <button onclick="processAttendanceScan('${p.id}', 'Manual Admin', 'Alfa', '${jenisFilter}', '${dateFilter}')" class="px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-bold shadow-xs hover:bg-rose-700 transition" title="Absenkan Alfa">Alfa</button>
           </td>
         </tr>
       `).join('');
     }
 
-    // Handler Eksekusi Aksi Manual dari Tabel Belum Absen
-    function handleActionManual(idCode, status, jenisAbsen, dateStr) {
-      processAttendanceScan(idCode, 'Aksi Manual Tabel', status, jenisAbsen, dateStr);
+    function exportRekapCSV() {
+      if (attendanceLogs.length === 0) { alert("Tidak ada data rekap untuk diexport!"); return; }
+      let csv = "Timestamp,ID,Nama,Kelas/Jabatan,SesiAbsen,Status,Peran,Metode\n";
+      attendanceLogs.forEach(l => {
+        csv += `"${l.timestamp}","${l.nisn}","${l.nama}","${l.kelas}","${l.jenisAbsen}","${l.status}","${l.peran}","${l.method}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Rekap_Absensi_${getTodayLocalDateStr()}.csv`;
+      a.click();
     }
 
-    /* ============ CHART.JS ============ */
     function initChart() {
       const ctx = document.getElementById('attendancePieChart');
       if (!ctx) return;
       pieChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: ['Hadir', 'Izin/Sakit', 'Alfa / Belum Absen'],
+          labels: ['Hadir', 'Izin/Sakit', 'Alfa/Belum'],
           datasets: [{
             data: [0, 0, 0],
             backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'],
             borderWidth: 0
           }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom', labels: { font: { family: 'Plus Jakarta Sans', size: 11 }, boxWidth: 12 } }
-          }
-        }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
       });
     }
 
     function updatePieChart(hadir, izin, alfa) {
-      if (pieChartInstance) {
-        pieChartInstance.data.datasets[0].data = [hadir, izin, alfa];
-        pieChartInstance.update();
-      }
+      if (!pieChartInstance) return;
+      pieChartInstance.data.datasets[0].data = [hadir, izin, alfa];
+      pieChartInstance.update();
     }
   </script>
 </body>
